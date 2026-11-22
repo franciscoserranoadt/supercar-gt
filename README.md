@@ -1,6 +1,6 @@
 # Supercar GP
 
-Juego de carreras arcade para Android: superdeportivos en 6 circuitos
+Juego de carreras arcade para Android: superdeportivos en 6 circuitos con mapa
 (Monza, Montecarlo, Suzuka, Spa con lluvia, Las Vegas de noche y Jarama).
 
 - Gráficos vectoriales dibujados a la resolución nativa de la pantalla.

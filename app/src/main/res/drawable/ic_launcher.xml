@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- fondo: atardecer -->
+    <path android:fillColor="#FF1B1035" android:pathData="M54,4a50,50 0,1 1,0 100a50,50 0,1 1,0 -100z" />
+    <path android:fillColor="#FFFF6A3D" android:pathData="M8,62a46,46 0,0 1,92 0z" />
+    <path android:fillColor="#FFFFC23D" android:pathData="M38,62a16,16 0,0 1,32 0z" />
+    <!-- carretera -->
+    <path android:fillColor="#FF2A2A33" android:pathData="M46,62h16l30,30a50,50 0,0 1,-76 0z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M53,64h2l1,8h-4z M52,76h4l1.5,12h-7z" />
+    <!-- coche visto desde atrás -->
+    <path android:fillColor="#FF111111" android:pathData="M26,84h12v10h-12z M70,84h12v10h-12z" />
+    <path android:fillColor="#FFE0141E" android:pathData="M24,88 L28,74 Q32,66 44,64 L64,64 Q76,66 80,74 L84,88z" />
+    <path android:fillColor="#FF223047" android:pathData="M38,72 L44,66 L64,66 L70,72z" />
+    <path android:fillColor="#FFFF3B3B" android:pathData="M28,78h16v4h-16z M64,78h16v4h-16z" />
+    <path android:fillColor="#FFFFE9A8" android:pathData="M30,79h4v2h-4z M74,79h4v2h-4z" />
+    <path android:fillColor="#FF7A0A10" android:pathData="M22,72h64v3h-64z" />
+</vector>

@@ -1,0 +1,45 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.fserrano.supercargp'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.fserrano.supercargp'
+        minSdk 23
+        targetSdk 34
+        // Sube sola en cada compilación para que Android acepte la actualización encima
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+        versionName "1." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+    }
+
+    signingConfigs {
+        fija {
+            // Firma fija: así cada versión se instala encima de la anterior
+            storeFile rootProject.file('supercargp.jks')
+            storePassword System.getenv('KEYSTORE_PASS') ?: ''
+            keyAlias 'supercargp'
+            keyPassword System.getenv('KEYSTORE_PASS') ?: ''
+        }
+    }
+
+    buildTypes {
+        debug {
+            if (System.getenv('KEYSTORE_PASS')) signingConfig signingConfigs.fija
+        }
+        release {
+            minifyEnabled false
+            if (System.getenv('KEYSTORE_PASS')) signingConfig signingConfigs.fija
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+}

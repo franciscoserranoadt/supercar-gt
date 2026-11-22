@@ -80,121 +80,216 @@ function resize() {
    SONIDO — todo sintetizado, sin archivos
    ========================================================= */
 const mf = n => 440 * Math.pow(2, (n - 69) / 12);
+// Canciones synthwave: acordes (MIDI), bajo y melodía por compás
 const SONGS = [
-  { bpm: 100, prog: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]] },   // menú
-  { bpm: 132, prog: [[50, 53, 57], [46, 50, 53], [48, 52, 55], [45, 49, 52]] },   // carrera
-  { bpm: 116, prog: [[52, 55, 59], [48, 52, 55], [55, 59, 62], [50, 54, 57]] }    // resultados
+  { bpm: 96, prog: [[57, 60, 64, 67], [53, 57, 60, 64], [48, 52, 55, 59], [55, 59, 62, 65]],
+    mel: [76, -1, 74, 72, -1, 69, -1, -1, 72, -1, 74, -1, 76, -1, 79, -1] },                 // menú
+  { bpm: 118, prog: [[50, 53, 57, 60], [46, 50, 53, 57], [48, 52, 55, 59], [45, 49, 52, 57]],
+    mel: [74, -1, 77, -1, 76, 74, -1, 72, -1, 69, -1, 72, 74, -1, -1, -1] },                 // carrera
+  { bpm: 104, prog: [[52, 55, 59, 62], [48, 52, 55, 59], [55, 59, 62, 66], [50, 54, 57, 62]],
+    mel: [83, -1, 81, -1, 79, -1, 78, 79, -1, -1, 74, -1, 76, -1, -1, -1] }                  // resultados
 ];
 const AU = {
-  ac: null, master: null, musG: null, sfxG: null, nb: null, song: null, want: null, nextT: 0, step: 0, eng: null,
+  ac: null, master: null, musG: null, sfxG: null, nb: null, song: null, want: null, nextT: 0, step: 0, eng: null, gear: 0,
   init() {
     if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
-      this.ac = new AC();
-      this.master = this.ac.createGain(); this.master.gain.value = 0.7; this.master.connect(this.ac.destination);
-      this.musG = this.ac.createGain(); this.musG.connect(this.master);
-      this.sfxG = this.ac.createGain(); this.sfxG.connect(this.master);
-      this.setVol();
-      const n = this.ac.sampleRate * 2;
-      this.nb = this.ac.createBuffer(1, n, this.ac.sampleRate);
+      const a = this.ac = new AC();
+      // compresor final para que nada sature ni suene chillón
+      const comp = a.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.2;
+      this.master = a.createGain(); this.master.gain.value = 0.85;
+      this.master.connect(comp); comp.connect(a.destination);
+      const n = a.sampleRate * 2;
+      this.nb = a.createBuffer(1, n, a.sampleRate);
       const d = this.nb.getChannelData(0);
       for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      // reverberación sintética
+      const len = Math.floor(a.sampleRate * 2.2), ir = a.createBuffer(2, len, a.sampleRate);
+      for (let c = 0; c < 2; c++) { const ch = ir.getChannelData(c); for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+      this.rev = a.createConvolver(); this.rev.buffer = ir;
+      const revG = a.createGain(); revG.gain.value = 0.35; this.rev.connect(revG); revG.connect(this.master);
+      // música: volumen, eco y reverb
+      this.musG = a.createGain(); this.musG.connect(this.master);
+      this.musBus = a.createGain(); this.musBus.connect(this.musG);
+      const send = a.createGain(); send.gain.value = 0.3; this.musBus.connect(send); send.connect(this.rev);
+      this.dly = a.createDelay(1); this.dly.delayTime.value = 0.375;
+      const fb = a.createGain(); fb.gain.value = 0.32; const dl = a.createBiquadFilter(); dl.type = 'lowpass'; dl.frequency.value = 2200;
+      this.dly.connect(dl); dl.connect(fb); fb.connect(this.dly); dl.connect(this.musBus);
+      this.sfxG = a.createGain(); this.sfxG.connect(this.master);
+      const sfxSend = a.createGain(); sfxSend.gain.value = 0.12; this.sfxG.connect(sfxSend); sfxSend.connect(this.rev);
+      // curva de saturación suave para el motor
+      const curve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 2.2); }
+      this.curve = curve;
+      this.setVol();
       if (this.want !== null) { const w = this.want; this.song = null; this.playSong(w); }
     } catch (e) { this.ac = null; }
   },
   setVol() {
     if (!this.ac) return;
-    this.musG.gain.value = save.music ? 0.26 : 0;
+    const race = this.song === 1;
+    this.musG.gain.setTargetAtTime(save.music ? (race ? 0.16 : 0.3) : 0, this.ac.currentTime, 0.3);
     this.sfxG.gain.value = save.sfx ? 0.9 : 0;
   },
-  _tone(at, f, dur, type, vol, slide, dest) {
-    const o = this.ac.createOscillator(), g = this.ac.createGain();
-    o.type = type || 'square';
-    o.frequency.setValueAtTime(f, at);
-    if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, f + slide), at + dur);
-    g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0008, at + dur);
-    o.connect(g); g.connect(dest || this.sfxG); o.start(at); o.stop(at + dur + 0.03);
+  _env(g, at, a, peak, dur) {
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(peak, at + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
   },
-  _noise(at, dur, vol, ft, fq, dest) {
+  _tone(at, f, dur, type, vol, slide, dest, atk) {
+    const o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f, at);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f + slide), at + dur);
+    this._env(g, at, atk || 0.005, vol, dur);
+    o.connect(g); g.connect(dest || this.sfxG); o.start(at); o.stop(at + dur + 0.05);
+  },
+  _noise(at, dur, vol, ft, fq, dest, q) {
     const s = this.ac.createBufferSource(); s.buffer = this.nb;
-    const f = this.ac.createBiquadFilter(); f.type = ft; f.frequency.value = fq;
-    const g = this.ac.createGain(); g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0008, at + dur);
-    s.connect(f); f.connect(g); g.connect(dest || this.sfxG); s.start(at, Math.random() * 1.5); s.stop(at + dur + 0.03);
+    const f = this.ac.createBiquadFilter(); f.type = ft; f.frequency.value = fq; if (q) f.Q.value = q;
+    const g = this.ac.createGain(); this._env(g, at, 0.003, vol, dur);
+    s.connect(f); f.connect(g); g.connect(dest || this.sfxG); s.start(at, Math.random() * 1.5); s.stop(at + dur + 0.05);
   },
   tone(f, dur, type, vol, slide, delay) { if (this.ac) this._tone(this.ac.currentTime + (delay || 0), f, dur, type, vol, slide); },
-  noise(dur, vol, ft, fq) { if (this.ac) this._noise(this.ac.currentTime, dur, vol, ft, fq); },
-  click() { this.tone(700, 0.06, 'square', 0.1); },
-  beep(hi) { this.tone(hi ? 1046 : 523, hi ? 0.6 : 0.25, 'square', 0.22); },
-  crash() { this.noise(0.6, 0.7, 'lowpass', 1200); this.tone(90, 0.35, 'sawtooth', 0.3, -50); },
-  bump() { this.noise(0.18, 0.45, 'lowpass', 700); this.tone(140, 0.12, 'square', 0.15, -60); },
-  coin() { this.tone(988, 0.08, 'square', 0.14); this.tone(1319, 0.3, 'square', 0.14, 0, 0.08); },
-  nitro() { this.noise(0.7, 0.35, 'highpass', 1500); this.tone(200, 0.6, 'sawtooth', 0.12, 500); },
-  lap() { [784, 988, 1175].forEach((f, i) => this.tone(f, 0.18, 'square', 0.14, 0, i * 0.09)); },
-  win() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => this.tone(f, 0.25, 'square', 0.15, 0, i * 0.12)); },
+  noise(dur, vol, ft, fq, q) { if (this.ac) this._noise(this.ac.currentTime, dur, vol, ft, fq, null, q); },
+  click() { this.tone(1200, 0.05, 'sine', 0.12); this.tone(1800, 0.04, 'sine', 0.05, 0, 0.01); },
+  beep(hi) {
+    if (!this.ac) return;
+    const f = hi ? 1318 : 659, t = this.ac.currentTime;
+    this._tone(t, f, hi ? 0.9 : 0.35, 'sine', 0.3); this._tone(t, f * 2, hi ? 0.6 : 0.2, 'sine', 0.06);
+  },
+  crash() {
+    if (!this.ac) return; const t = this.ac.currentTime;
+    this._noise(t, 0.5, 0.8, 'lowpass', 500); this._noise(t, 0.25, 0.35, 'bandpass', 2500, null, 1.5);
+    this._tone(t, 70, 0.4, 'sine', 0.6, -35);
+    for (let i = 0; i < 4; i++) this._noise(t + 0.05 + i * 0.07, 0.08, 0.15, 'highpass', 4000);
+  },
+  bump() { if (!this.ac) return; const t = this.ac.currentTime; this._noise(t, 0.18, 0.5, 'lowpass', 400); this._tone(t, 110, 0.15, 'sine', 0.35, -50); },
+  coin() { this.tone(1568, 0.12, 'sine', 0.16); this.tone(2093, 0.4, 'sine', 0.14, 0, 0.09); },
+  nitro() {
+    if (!this.ac) return; const t = this.ac.currentTime;
+    this._noise(t, 0.9, 0.35, 'bandpass', 1200, null, 0.8);
+    this._tone(t, 120, 0.8, 'sawtooth', 0.05, 260);
+  },
+  lap() { [880, 1108, 1318].forEach((f, i) => this.tone(f, 0.3, 'sine', 0.16, 0, i * 0.1)); },
+  win() { [523, 659, 784, 1046, 1318].forEach((f, i) => { this.tone(f, 0.5, 'triangle', 0.14, 0, i * 0.13); this.tone(f / 2, 0.5, 'sine', 0.1, 0, i * 0.13); }); },
+  pop() {   // petardeo del escape al soltar gas
+    if (!this.ac) return; const t = this.ac.currentTime;
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) { const at = t + i * (0.05 + Math.random() * 0.06); this._noise(at, 0.06, 0.4, 'lowpass', 900); this._tone(at, 60 + Math.random() * 40, 0.05, 'sine', 0.3); }
+  },
+  shift() {  // cambio de marcha: corte breve de potencia
+    const e = this.eng; if (!e) return; const t = this.ac.currentTime;
+    e.cut.gain.cancelScheduledValues(t); e.cut.gain.setValueAtTime(0.35, t); e.cut.gain.linearRampToValueAtTime(1, t + 0.12);
+  },
   engineOn() {
     if (!this.ac || this.eng) return;
     const a = this.ac, e = {};
-    e.o1 = a.createOscillator(); e.o1.type = 'sawtooth';
-    e.o2 = a.createOscillator(); e.o2.type = 'square';
-    e.o3 = a.createOscillator(); e.o3.type = 'sawtooth';
-    e.f = a.createBiquadFilter(); e.f.type = 'lowpass'; e.f.frequency.value = 500; e.f.Q.value = 5;
+    // motor: fundamental, subarmónico y armónicos, saturación y filtro
+    e.oscs = [['sawtooth', 1, 0.5], ['sine', 0.5, 0.8], ['sawtooth', 2.003, 0.18], ['square', 1.498, 0.08]].map(([type, mul, vol]) => {
+      const o = a.createOscillator(); o.type = type; const g = a.createGain(); g.gain.value = vol; o.connect(g); return { o, g, mul };
+    });
+    e.mix = a.createGain(); e.mix.gain.value = 0.6;
+    for (const x of e.oscs) x.g.connect(e.mix);
+    // modulación de amplitud = pulsos de combustión
+    e.am = a.createGain(); e.am.gain.value = 0.75;
+    e.lfo = a.createOscillator(); e.lfo.type = 'sine'; const lfoG = a.createGain(); lfoG.gain.value = 0.25;
+    e.lfo.connect(lfoG); lfoG.connect(e.am.gain);
+    e.shp = a.createWaveShaper(); e.shp.curve = this.curve; e.shp.oversample = '2x';
+    e.f = a.createBiquadFilter(); e.f.type = 'lowpass'; e.f.frequency.value = 600; e.f.Q.value = 0.9;
+    e.body = a.createBiquadFilter(); e.body.type = 'peaking'; e.body.frequency.value = 160; e.body.gain.value = 6; e.body.Q.value = 1;
+    e.cut = a.createGain(); e.cut.gain.value = 1;
     e.g = a.createGain(); e.g.gain.value = 0;
-    const m2 = a.createGain(); m2.gain.value = 0.6;
-    e.o1.connect(e.f); e.o2.connect(m2); m2.connect(e.f); e.o3.connect(e.f); e.f.connect(e.g); e.g.connect(this.sfxG);
+    e.mix.connect(e.am); e.am.connect(e.shp); e.shp.connect(e.f); e.f.connect(e.body); e.body.connect(e.cut); e.cut.connect(e.g); e.g.connect(this.sfxG);
+    // silbido del turbo
+    e.tb = a.createOscillator(); e.tb.type = 'sine'; e.tg = a.createGain(); e.tg.gain.value = 0; e.tb.connect(e.tg); e.tg.connect(this.sfxG);
     const mkN = (type, fq, q) => {
       const s = a.createBufferSource(); s.buffer = this.nb; s.loop = true;
       const f = a.createBiquadFilter(); f.type = type; f.frequency.value = fq; f.Q.value = q;
-      const g = a.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.sfxG); s.start(); return [s, g];
+      const g = a.createGain(); g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.sfxG); s.start(); return [s, g, f];
     };
-    [e.ns, e.ng] = mkN('bandpass', 2600, 4);   // derrape
-    [e.ws, e.wg] = mkN('highpass', 900, 0.7);  // viento / nitro
-    e.o1.start(); e.o2.start(); e.o3.start();
-    this.eng = e;
+    [e.ns, e.ng, e.nf] = mkN('bandpass', 1900, 7);    // derrape de neumáticos
+    [e.ws, e.wg] = mkN('lowpass', 700, 0.5);          // viento
+    [e.rs, e.rg] = mkN('lowpass', 180, 1);            // traqueteo fuera de pista
+    for (const x of e.oscs) x.o.start(); e.lfo.start(); e.tb.start();
+    this.eng = e; this.gear = 0; this.lastLoad = 0;
   },
-  engineSet(rpm, load, skid, wind) {
+  engineSet(rpm, load, skid, wind, rough, gear) {
     const e = this.eng; if (!e) return;
-    const t = this.ac.currentTime, f = 36 + rpm * 150;
-    e.o1.frequency.setTargetAtTime(f, t, 0.04);
-    e.o2.frequency.setTargetAtTime(f * 0.5, t, 0.04);
-    e.o3.frequency.setTargetAtTime(f * 1.012, t, 0.04);
-    e.f.frequency.setTargetAtTime(280 + rpm * 1400 + load * 900, t, 0.05);
-    e.g.gain.setTargetAtTime(0.045 + load * 0.05 + rpm * 0.035, t, 0.05);
-    e.ng.gain.setTargetAtTime(skid * 0.16, t, 0.05);
-    e.wg.gain.setTargetAtTime(wind * 0.1, t, 0.1);
+    const t = this.ac.currentTime, f = 32 + rpm * 118;
+    for (const x of e.oscs) x.o.frequency.setTargetAtTime(f * x.mul, t, 0.03);
+    e.lfo.frequency.setTargetAtTime(f * 0.5, t, 0.03);
+    e.f.frequency.setTargetAtTime(320 + rpm * (900 + load * 1600), t, 0.05);
+    e.g.gain.setTargetAtTime(0.1 + load * 0.07 + rpm * 0.04, t, 0.06);
+    e.tb.frequency.setTargetAtTime(1800 + rpm * 2600, t, 0.08);
+    e.tg.gain.setTargetAtTime(load * rpm * 0.012, t, 0.1);
+    e.nf.frequency.setTargetAtTime(1700 + Math.random() * 500, t, 0.05);
+    e.ng.gain.setTargetAtTime(skid * 0.13, t, 0.06);
+    e.wg.gain.setTargetAtTime(wind * 0.18, t, 0.15);
+    e.rg.gain.setTargetAtTime((rough || 0) * 0.5, t, 0.05);
+    if (gear !== undefined && gear > this.gear) this.shift();
+    if (gear !== undefined) this.gear = gear;
+    if (this.lastLoad > 0.8 && load < 0.5 && rpm > 0.6 && Math.random() < 0.7) this.pop();
+    this.lastLoad = load;
   },
   engineOff() {
     const e = this.eng; if (!e) return; this.eng = null;
     const t = this.ac.currentTime;
-    e.g.gain.setTargetAtTime(0, t, 0.05); e.ng.gain.setTargetAtTime(0, t, 0.05); e.wg.gain.setTargetAtTime(0, t, 0.05);
-    setTimeout(() => { try { e.o1.stop(); e.o2.stop(); e.o3.stop(); e.ns.stop(); e.ws.stop(); } catch (x) {} }, 400);
+    for (const g of [e.g, e.ng, e.wg, e.rg, e.tg]) g.gain.setTargetAtTime(0, t, 0.06);
+    setTimeout(() => { try { for (const x of e.oscs) x.o.stop(); e.lfo.stop(); e.tb.stop(); e.ns.stop(); e.ws.stop(); e.rs.stop(); } catch (x) {} }, 500);
   },
   playSong(i) {
     this.want = i;
     if (!this.ac || this.song === i) return;
-    this.song = i; this.step = 0; this.nextT = this.ac.currentTime + 0.06;
+    this.song = i; this.step = 0; this.nextT = this.ac.currentTime + 0.08;
+    this.dly.delayTime.value = 60 / SONGS[i].bpm * 0.75;
+    this.setVol();
   },
   stopSong() { this.song = null; this.want = null; },
   _kick(t) {
     const o = this.ac.createOscillator(), g = this.ac.createGain();
-    o.type = 'sine'; o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.14);
-    g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    o.connect(g); g.connect(this.musG); o.start(t); o.stop(t + 0.2);
+    o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+    g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g); g.connect(this.musG); o.start(t); o.stop(t + 0.32);
+  },
+  _snare(t) { this._noise(t, 0.22, 0.32, 'bandpass', 1800, this.musBus, 0.7); this._tone(t, 190, 0.1, 'triangle', 0.25, -60, this.musBus); },
+  _pad(t, notes, dur) {
+    const f = this.ac.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
+    f.frequency.setValueAtTime(500, t); f.frequency.linearRampToValueAtTime(1500, t + dur * 0.5); f.frequency.linearRampToValueAtTime(700, t + dur);
+    const g = this.ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + dur * 0.25); g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    f.connect(g); g.connect(this.musBus);
+    for (const n of notes) for (const det of [-7, 7]) {
+      const o = this.ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mf(n); o.detune.value = det;
+      o.connect(f); o.start(t); o.stop(t + dur + 0.05);
+    }
+  },
+  _bass(t, n, dur) {
+    const o = this.ac.createOscillator(), o2 = this.ac.createOscillator(), f = this.ac.createBiquadFilter(), g = this.ac.createGain();
+    o.type = 'sawtooth'; o2.type = 'sine'; o.frequency.value = o2.frequency.value = mf(n);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(220, t + dur);
+    // "sidechain": entra suave tras el bombo
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(f); o2.connect(f); f.connect(g); g.connect(this.musG); o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
   },
   tick() {
     if (!this.ac || this.song === null || this.ac.state !== 'running') return;
     const s = SONGS[this.song], sp = 60 / s.bpm / 4;
     if (this.nextT < this.ac.currentTime - 0.5) this.nextT = this.ac.currentTime + 0.05;
-    while (this.nextT < this.ac.currentTime + 0.2) {
-      const st = this.step, i = st % 16, ch = s.prog[Math.floor(st / 16) % s.prog.length], t = this.nextT;
-      if (i % 4 === 0) this._kick(t);
-      if (i === 4 || i === 12) this._noise(t, 0.14, 0.22, 'highpass', 1600, this.musG);
-      if (i % 2 === 0) this._noise(t, 0.035, 0.07, 'highpass', 7000, this.musG);
-      if (i % 2 === 0) this._tone(t, mf(ch[0] - 24 + (i % 4 === 2 ? 12 : 0)), sp * 1.7, 'sawtooth', 0.14, 0, this.musG);
-      const arp = [0, 1, 2, 1, 0, 2, 1, 2];
-      this._tone(t, mf(ch[arp[i % 8]] + 12), sp * 0.9, 'square', 0.04, 0, this.musG);
-      if (i === 0) for (const n of ch) this._tone(t, mf(n), sp * 15, 'triangle', 0.045, 0, this.musG);
-      if (this.song === 1 && (i === 0 || i === 6 || i === 10)) this._tone(t, mf(ch[(i / 4 | 0) % 3] + 24), sp * 2.5, 'sawtooth', 0.025, 0, this.musG);
+    while (this.nextT < this.ac.currentTime + 0.25) {
+      const st = this.step, i = st % 16, bar = Math.floor(st / 16), ch = s.prog[bar % s.prog.length], t = this.nextT;
+      const intro = bar < 2;
+      if (i % 4 === 0 && !intro) this._kick(t);
+      if ((i === 4 || i === 12) && !intro) this._snare(t);
+      if (i % 2 === 1 && !intro) this._noise(t, 0.04, 0.035, 'highpass', 8000, this.musBus);
+      if (i % 2 === 0) this._bass(t, ch[0] - 24 + (i % 8 === 6 ? 12 : 0), sp * 1.8);
+      if (i === 0) this._pad(t, ch, sp * 16);
+      const arp = [0, 1, 2, 3, 2, 1, 2, 3];
+      if (i % 2 === 0) { const at = t; this._tone(at, mf(ch[arp[(i / 2) % 8]] + 12), sp * 1.6, 'triangle', 0.035, 0, this.musBus); this._tone(at, mf(ch[arp[(i / 2) % 8]] + 12), sp * 1.6, 'triangle', 0.02, 0, this.dly); }
+      if (bar % 4 >= 2 || this.song !== 1) {
+        const m = s.mel[i];
+        if (m > 0) { this._tone(t, mf(m), sp * 3, 'square', 0.022, 0, this.musBus, 0.02); this._tone(t, mf(m), sp * 3, 'sine', 0.04, 0, this.dly, 0.02); }
+      }
       this.nextT += sp; this.step++;
     }
   }
@@ -376,7 +471,10 @@ function artPine(g, w, h, c) {
     const y0 = h * (0.86 - i * 0.19), y1 = h * (0.86 - i * 0.19 - 0.34), hw = w * (0.48 - i * 0.095);
     const gr = g.createLinearGradient(cx - hw, 0, cx + hw, 0);
     gr.addColorStop(0, shade(c, 0.2)); gr.addColorStop(0.55, c); gr.addColorStop(1, shade(c, -0.45));
-    g.fillStyle = gr; g.beginPath(); g.moveTo(cx - hw, y0); g.quadraticCurveTo(cx - hw * 0.3, y0 - h * 0.05, cx, Math.max(1, y1)); g.quadraticCurveTo(cx + hw * 0.3, y0 - h * 0.05, cx + hw, y0); g.closePath(); g.fill();
+    g.fillStyle = gr; g.beginPath(); g.moveTo(cx, Math.max(1, y1)); g.lineTo(cx + hw, y0);
+    for (let k = 1; k <= 7; k++) g.lineTo(cx + hw - k * hw * 2 / 7 + (k % 2 ? hw * 0.07 : 0), y0 - (k % 2 ? h * 0.035 : 0));
+    g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.10)'; g.beginPath(); g.moveTo(cx, Math.max(1, y1)); g.lineTo(cx - hw * 0.8, y0 - h * 0.02); g.lineTo(cx - hw * 0.3, y0 - h * 0.03); g.closePath(); g.fill();
   }
 }
 function artBlobTree(g, w, h, c, hl) {
@@ -387,6 +485,13 @@ function artBlobTree(g, w, h, c, hl) {
     const gr = g.createRadialGradient(x - R * 0.35, y - R * 0.4, R * 0.1, x, y, R);
     gr.addColorStop(0, hl); gr.addColorStop(0.6, c); gr.addColorStop(1, shade(c, -0.4));
     g.fillStyle = gr; g.beginPath(); g.arc(x, y, R, 0, Math.PI * 2); g.fill();
+    g.save(); g.clip(); srand(Math.round(x * 7 + y * 13));
+    for (let i = 0; i < 26; i++) {
+      const lx = x + (rnd() - 0.5) * R * 2, ly = y + (rnd() - 0.5) * R * 2, lr = R * (0.08 + rnd() * 0.1);
+      g.fillStyle = (lx - x) + (ly - y) < 0 ? rgba(hl.length === 7 ? hl : '#ffffff', 0.35) : 'rgba(0,0,0,0.16)';
+      g.beginPath(); g.arc(lx, ly, lr, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
   }
 }
 function artPalm(g, w, h) {
@@ -520,16 +625,16 @@ function artOlive(g, w, h) {
 }
 
 const SPR = {
-  pine:    { w: 1500, cw: 220, ch: 420, col: 0.25, draw: (g, w, h) => artPine(g, w, h, '#2f7a3a') },
-  pineD:   { w: 1600, cw: 220, ch: 440, col: 0.25, draw: (g, w, h) => artPine(g, w, h, '#24563a') },
-  tree:    { w: 1800, cw: 300, ch: 340, col: 0.25, draw: (g, w, h) => artBlobTree(g, w, h, '#3f8f3c', '#8fd06a') },
-  cherry:  { w: 1800, cw: 300, ch: 320, col: 0.25, draw: (g, w, h) => artBlobTree(g, w, h, '#f08fb4', '#ffe0ee') },
-  palm:    { w: 1700, cw: 300, ch: 440, col: 0.2, draw: artPalm },
-  bush:    { w: 900, cw: 200, ch: 120, col: 0.8, draw: (g, w, h) => artBush(g, w, h, '#3f8f3c') },
+  pine:    { sh: 0.3, w: 1500, cw: 220, ch: 420, col: 0.25, draw: (g, w, h) => artPine(g, w, h, '#2f7a3a') },
+  pineD:   { sh: 0.3, w: 1600, cw: 220, ch: 440, col: 0.25, draw: (g, w, h) => artPine(g, w, h, '#24563a') },
+  tree:    { sh: 0.42, w: 1800, cw: 300, ch: 340, col: 0.25, draw: (g, w, h) => artBlobTree(g, w, h, '#3f8f3c', '#8fd06a') },
+  cherry:  { sh: 0.42, w: 1800, cw: 300, ch: 320, col: 0.25, draw: (g, w, h) => artBlobTree(g, w, h, '#f08fb4', '#ffe0ee') },
+  palm:    { sh: 0.3, w: 1700, cw: 300, ch: 440, col: 0.2, draw: artPalm },
+  bush:    { sh: 0.45, w: 900, cw: 200, ch: 120, col: 0.8, draw: (g, w, h) => artBush(g, w, h, '#3f8f3c') },
   drybush: { w: 800, cw: 200, ch: 110, col: 0, draw: (g, w, h) => artBush(g, w, h, '#a69a4a') },
   rock:    { w: 1100, cw: 220, ch: 140, col: 0.8, draw: artRock },
-  olive:   { w: 1500, cw: 260, ch: 260, col: 0.2, draw: artOlive },
-  stand:   { w: 4200, cw: 520, ch: 300, col: 0.95, draw: artStand },
+  olive:   { sh: 0.4, w: 1500, cw: 260, ch: 260, col: 0.2, draw: artOlive },
+  stand:   { sh: 0.5, w: 4200, cw: 520, ch: 300, col: 0.95, draw: artStand },
   tires:   { w: 520, cw: 160, ch: 110, col: 0.9, draw: artTires },
   wall:    { w: 700, cw: 180, ch: 70, col: 0.9, draw: artWall },
   rail:    { w: 700, cw: 180, ch: 60, col: 0.9, draw: artRail },
@@ -538,16 +643,16 @@ const SPR = {
   gantry:  { w: 5600, cw: 900, ch: 560, col: 0, center: true, draw: artGantry }
 };
 for (let v = 0; v < 4; v++) {
-  SPR['board' + v] = { w: 2400, cw: 480, ch: 300, col: 0.9, draw: (g, w, h) => artBoard(g, w, h, v) };
-  SPR['house' + v] = { w: 3200, cw: 360, ch: 520, col: 0.95, draw: (g, w, h) => artHouse(g, w, h, v) };
+  SPR['board' + v] = { sh: 0.4, w: 2400, cw: 480, ch: 300, col: 0.9, draw: (g, w, h) => artBoard(g, w, h, v) };
+  SPR['house' + v] = { sh: 0.5, w: 3200, cw: 360, ch: 520, col: 0.95, draw: (g, w, h) => artHouse(g, w, h, v) };
   SPR['tower' + v] = { w: 3600, cw: 360, ch: 720, col: 0.95, draw: (g, w, h) => artTower(g, w, h, v) };
 }
 // la farola de la izquierda se coloca a la izquierda aunque su offset sea 0
 const sprCache = {};
 function sprImg(type) {
   let c = sprCache[type]; if (c) return c;
-  const d = SPR[type]; c = mkCanvas(d.cw, d.ch);
-  const g = c.getContext('2d'); d.draw(g, d.cw, d.ch);
+  const d = SPR[type], k = 1.6; c = mkCanvas(d.cw * k, d.ch * k);
+  const g = c.getContext('2d'); d.draw(g, c.width, c.height);
   return (sprCache[type] = c);
 }
 
@@ -601,7 +706,20 @@ function drawCarArt(g, w, h, st, color, pose) {
   sideG.addColorStop(0, 'rgba(0,0,0,0.45)'); sideG.addColorStop(0.18, 'rgba(0,0,0,0)'); sideG.addColorStop(0.35, 'rgba(255,255,255,0.12)');
   sideG.addColorStop(0.65, 'rgba(255,255,255,0.05)'); sideG.addColorStop(0.82, 'rgba(0,0,0,0)'); sideG.addColorStop(1, 'rgba(0,0,0,0.5)');
   g.fillStyle = sideG; g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(255,255,255,0.28)'; g.fillRect(X(0.05), Y(0.425), X(0.95) - X(0.05), Y(0.012));
+  // reflejo del cielo en la parte alta y del horizonte en la cintura (efecto barniz)
+  const sk = g.createLinearGradient(0, Y(roofY), 0, Y(0.47));
+  sk.addColorStop(0, 'rgba(210,235,255,0.0)'); sk.addColorStop(0.55, 'rgba(210,235,255,0.22)'); sk.addColorStop(0.9, 'rgba(255,255,255,0.32)'); sk.addColorStop(1, 'rgba(0,0,0,0.25)');
+  g.fillStyle = sk; g.fillRect(0, Y(roofY), w, Y(0.47 - roofY));
+  g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(0, Y(0.47), w, Y(0.018));
+  g.fillStyle = 'rgba(255,255,255,0.45)'; g.fillRect(X(0.05), Y(0.425), X(0.95) - X(0.05), Y(0.008));
+  for (const hx of [0.17, 0.83]) {
+    const sp = g.createRadialGradient(X(hx), Y(0.5), 0, X(hx), Y(0.5), w * 0.13);
+    sp.addColorStop(0, 'rgba(255,255,255,0.35)'); sp.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = sp; g.fillRect(X(hx) - w * 0.13, Y(0.5) - w * 0.13, w * 0.26, w * 0.26);
+  }
+  // líneas de carrocería (portón trasero)
+  g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = Math.max(1, w * 0.003);
+  g.beginPath(); g.moveTo(X(0.2), Y(0.445)); g.lineTo(X(0.8), Y(0.445)); g.moveTo(X(0.2), Y(0.445)); g.lineTo(X(0.16), Y(0.58)); g.moveTo(X(0.8), Y(0.445)); g.lineTo(X(0.84), Y(0.58)); g.stroke();
   g.restore();
   // luneta o rejillas del motor
   g.beginPath(); g.moveTo(X(0.31), Y(0.39)); g.lineTo(X(0.385), Y(roofY + 0.035)); g.lineTo(X(0.615), Y(roofY + 0.035)); g.lineTo(X(0.69), Y(0.39)); g.closePath();
@@ -613,7 +731,9 @@ function drawCarArt(g, w, h, st, color, pose) {
   g.fillStyle = '#121212'; rr(g, X(0.14), Y(0.58), X(0.86) - X(0.14), Y(0.14), w * 0.015); g.fill();
   g.strokeStyle = 'rgba(255,255,255,0.07)'; g.lineWidth = Math.max(1, w * 0.003);
   for (let x = 0.17; x < 0.84; x += 0.025) { g.beginPath(); g.moveTo(X(x), Y(0.6)); g.lineTo(X(x), Y(0.7)); g.stroke(); }
-  g.fillStyle = '#1b1b1b'; g.beginPath(); g.moveTo(X(0.12), Y(0.75)); g.lineTo(X(0.88), Y(0.75)); g.lineTo(X(0.84), Y(0.89)); g.lineTo(X(0.16), Y(0.89)); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(X(0.12), Y(0.75)); g.lineTo(X(0.88), Y(0.75)); g.lineTo(X(0.84), Y(0.89)); g.lineTo(X(0.16), Y(0.89)); g.closePath();
+  g.fillStyle = carbonPattern(g, w); g.fill();
+  const dg = g.createLinearGradient(0, Y(0.75), 0, Y(0.89)); dg.addColorStop(0, 'rgba(255,255,255,0.12)'); dg.addColorStop(1, 'rgba(0,0,0,0.5)'); g.fillStyle = dg; g.fill();
   g.fillStyle = '#2c2c2c'; for (let x = 0.24; x < 0.8; x += 0.08) g.fillRect(X(x), Y(0.76), w * 0.008, Y(0.12));
   // escapes
   const ex = st.exh === 'quad' ? [0.38, 0.45, 0.55, 0.62] : st.exh === 'twin' ? [0.3, 0.7] : [0.46, 0.54];
@@ -632,6 +752,12 @@ function drawCarArt(g, w, h, st, color, pose) {
   } else if (st.lights === 'strip') { g.fillRect(X(0.08), Y(0.485), X(0.92) - X(0.08), Y(0.035)); }
   else { g.lineWidth = w * 0.02; for (const [u, v, r] of lightSpots(st)) { g.beginPath(); g.arc(X(u), Y(v), r * w * 0.8, 0, Math.PI * 2); g.stroke(); } }
   g.restore();
+  g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,190,170,0.75)';
+  for (const [u, v, r] of lightSpots(st)) {
+    if (st.lights === 'strip') { g.fillRect(X(u) - r * w * 0.6, Y(0.497), r * w * 1.2, Y(0.008)); continue; }
+    g.beginPath(); g.arc(X(u), Y(v), r * w * 0.35, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
   // alerón
   if (st.wing) {
     g.fillStyle = '#1a1a1a'; g.fillRect(X(0.3), Y(0.2), w * 0.02, Y(0.21)); g.fillRect(X(0.7) - w * 0.02, Y(0.2), w * 0.02, Y(0.21));
@@ -644,11 +770,22 @@ function drawCarArt(g, w, h, st, color, pose) {
   g.fillStyle = '#c00'; g.fillRect(X(0.45), Y(roofY + 0.015), X(0.55) - X(0.45), Y(0.012));
   g.restore();
 }
+let carbonCache = null;
+function carbonPattern(g, w) {
+  const s = Math.max(4, Math.round(w * 0.012));
+  if (!carbonCache || carbonCache.s !== s) {
+    const c = mkCanvas(s * 2, s * 2), cg = c.getContext('2d');
+    cg.fillStyle = '#151515'; cg.fillRect(0, 0, s * 2, s * 2);
+    cg.fillStyle = '#2a2a2a'; cg.fillRect(0, 0, s, s); cg.fillRect(s, s, s, s);
+    carbonCache = { s, c };
+  }
+  return g.createPattern(carbonCache.c, 'repeat');
+}
 const carCache = new Map();
 function carImg(m, color, pose, big) {
   const key = m + color + pose + (big ? 'B' : 's');
   let c = carCache.get(key); if (c) return c;
-  const w = big ? 620 : 300, h = Math.round(w * 0.56);
+  const w = big ? 900 : 340, h = Math.round(w * 0.56);
   c = mkCanvas(w, h); drawCarArt(c.getContext('2d'), w, h, CARS[m].st, color, pose);
   carCache.set(key, c);
   return c;
@@ -683,6 +820,11 @@ function bgLayer(spec, lw, lh, far) {
     case 'mountains': {
       const t = terms(4, [3, 5, 8, 13]);
       ridge(t, lh * 0.55, lh * 0.28); g.fillStyle = vfill(lh * 0.1, shade(col, 0.15), shade(col, -0.25)); g.fill();
+      g.save(); g.clip();
+      for (let x = 0; x < lw; x += lh * 0.04) { const y = lh * 0.55 - lh * 0.28 * periodic(x, lw, t); g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(x, y + lh * 0.02, lh * 0.012, lh); }
+      g.restore();
+      g.beginPath(); for (let x = 0; x <= lw; x += 4) { const y = lh * 0.55 - lh * 0.28 * periodic(x, lw, t); x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = Math.max(1, lh * 0.01); g.stroke();
       if (spec.snow) { g.save(); ridge(t, lh * 0.55, lh * 0.28); g.clip(); g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(0, 0, lw, lh * 0.3); g.restore(); }
       break;
     }
@@ -954,7 +1096,7 @@ function update(dt) {
   const g6 = Math.min(5.99, sp * 5.6), gear = Math.floor(g6), frac = g6 - gear;
   const rpm = go ? (gear === 0 ? 0.15 + frac * 0.85 : 0.45 + frac * 0.55) : (gas || input.gas ? 0.5 + Math.random() * 0.1 : 0.12);
   p.skid = go ? clamp((Math.abs(steer) * sp - 0.55) * 1.6 + Math.abs(pSeg.curve) * sp * sp * 0.05 - 0.15, 0, 1) * (Math.abs(p.x) < 1 ? 1 : 0) : 0;
-  AU.engineSet(rpm, gas && go ? 1 : 0.2, p.skid, p.boost ? 1 : sp * 0.3);
+  AU.engineSet(rpm, gas && go ? 1 : 0.15, p.skid, p.boost ? 1 : sp * sp * 0.6, go && Math.abs(p.x) > 1.05 ? Math.min(1, sp * 2) : 0, go ? gear : 0);
 
   // fondo parallax
   BG.off[0] += pSeg.curve * sp * dt * 0.06;
@@ -1019,21 +1161,32 @@ function project(p, cx, cy, cz) {
   p.camera.x = p.world.x - cx; p.camera.y = p.world.y - cy; p.camera.z = p.world.z - cz;
   p.screen.scale = CAMD / p.camera.z;
   p.screen.x = W / 2 + p.screen.scale * p.camera.x * XS;
-  p.screen.y = H / 2 - p.screen.scale * p.camera.y * YS;
+  p.screen.y = Math.round(H / 2 - p.screen.scale * p.camera.y * YS);
   p.screen.w = p.screen.scale * RW * XS;
 }
 function poly(x1, y1, x2, y2, x3, y3, x4, y4, c) {
   const g = ctx; g.fillStyle = c; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x3, y3); g.lineTo(x4, y4); g.closePath(); g.fill();
 }
-function drawSegment(seg) {
-  const a0 = seg.p1.screen, b = seg.p2.screen, th = theme, c = seg.color;
-  const a = { x: a0.x, y: a0.y + Math.max(1, PX), w: a0.w };
+function drawSegment(seg, n) {
+  const a = seg.p1.screen, b = seg.p2.screen, th = theme, c = seg.color;
   const g = ctx;
-  g.fillStyle = th.ground[c]; g.fillRect(0, b.y, W, a.y - b.y + 1);
+  g.fillStyle = th.ground[c]; g.fillRect(0, b.y, W, a.y - b.y);
+  if (Math.floor(seg.index / 8) % 2) { g.fillStyle = th.night ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.05)'; g.fillRect(0, b.y, W, a.y - b.y); }
   const r1 = a.w / 6, r2 = b.w / 6, l1 = a.w / 36, l2 = b.w / 36;
   poly(a.x - a.w - r1, a.y, a.x - a.w, a.y, b.x - b.w, b.y, b.x - b.w - r2, b.y, th.rumble[c]);
   poly(a.x + a.w + r1, a.y, a.x + a.w, a.y, b.x + b.w, b.y, b.x + b.w + r2, b.y, th.rumble[c]);
   poly(a.x - a.w, a.y, a.x + a.w, a.y, b.x + b.w, b.y, b.x - b.w, b.y, th.road[c]);
+  if (n < 160) {
+    // brillo del asfalto en el centro y huellas oscuras de neumáticos
+    g.globalAlpha = th.rain ? 0.1 : 0.05;
+    poly(a.x - a.w * 0.55, a.y, a.x + a.w * 0.55, a.y, b.x + b.w * 0.55, b.y, b.x - b.w * 0.55, b.y, '#ffffff');
+    g.globalAlpha = 0.09;
+    for (const u of [-0.8, -0.53, -0.14, 0.14, 0.53, 0.8]) {
+      const h1 = a.w * 0.035, h2 = b.w * 0.035;
+      poly(a.x + a.w * u - h1, a.y, a.x + a.w * u + h1, a.y, b.x + b.w * u + h2, b.y, b.x + b.w * u - h2, b.y, '#000000');
+    }
+    g.globalAlpha = 1;
+  }
   // líneas de borde
   const e1 = a.w * 0.03, e2 = b.w * 0.03, ei1 = a.w * 0.05, ei2 = b.w * 0.05;
   poly(a.x - a.w + ei1, a.y, a.x - a.w + ei1 + e1, a.y, b.x - b.w + ei2 + e2, b.y, b.x - b.w + ei2, b.y, th.edge);
@@ -1051,7 +1204,7 @@ function drawSegment(seg) {
     for (let k = 1; k < LANES; k++) { poly(lx1 - l1 / 2, a.y, lx1 + l1 / 2, a.y, lx2 + l2 / 2, b.y, lx2 - l2 / 2, b.y, th.lane); lx1 += lw1; lx2 += lw2; }
   }
   if (th.rain && c === 1) { g.globalAlpha = 0.08; poly(a.x - a.w * 0.6, a.y, a.x + a.w * 0.6, a.y, b.x + b.w * 0.6, b.y, b.x - b.w * 0.6, b.y, '#ffffff'); g.globalAlpha = 1; }
-  if (seg.fog < 0.995) { g.globalAlpha = 1 - seg.fog; g.fillStyle = th.fog; g.fillRect(0, b.y, W, a.y - b.y + 1); g.globalAlpha = 1; }
+  if (seg.fog < 0.995) { g.globalAlpha = 1 - seg.fog; g.fillStyle = th.fog; g.fillRect(0, b.y, W, a.y - b.y); g.globalAlpha = 1; }
 }
 function drawSprite(img, worldW, scale, x, y, ox, oy, clipY, alpha) {
   const dw = worldW * scale * XS; if (dw < 1 || dw > W * 4) return;
@@ -1066,7 +1219,7 @@ function drawSprite(img, worldW, scale, x, y, ox, oy, clipY, alpha) {
 }
 function drawCarSprite(m, color, pose, scale, x, y, clipY, alpha, lights) {
   const dw = CARW * scale * XS;
-  const img = carImg(m, color, pose, dw > 280);
+  const img = carImg(m, color, pose, dw > 320);
   const r = drawSprite(img, CARW, scale, x, y, -0.5, -1, clipY, alpha);
   if (r && lights > 0 && alpha > 0.4) carGlow(m, r[0], r[1], r[2], r[3], lights * alpha);
   return r;
@@ -1082,6 +1235,9 @@ function renderWorld(camDist, camX, opts) {
   g.save();
   if (shake > 0) g.translate((Math.random() - 0.5) * shake * H * 0.02, (Math.random() - 0.5) * shake * H * 0.02);
   drawBackground(pY);
+  const hz = g.createLinearGradient(0, H * 0.3, 0, H * 0.62);
+  hz.addColorStop(0, rgba(th.fog, 0)); hz.addColorStop(1, rgba(th.fog, th.night ? 0.35 : 0.6));
+  g.fillStyle = hz; g.fillRect(0, H * 0.3, W, H * 0.32);
   let maxy = H, x = 0, dx = -(base.curve * basePct);
   for (let n = 0; n < DRAW; n++) {
     const seg = segments[(base.index + n) % N];
@@ -1094,7 +1250,7 @@ function renderWorld(camDist, camX, opts) {
     x += dx; dx += seg.curve;
     if (seg.p1.camera.z <= CAMD || seg.p2.screen.y >= seg.p1.screen.y || seg.p2.screen.y >= maxy) { seg.vis = false; continue; }
     seg.vis = true;
-    drawSegment(seg);
+    drawSegment(seg, n);
     maxy = seg.p1.screen.y;
   }
   if (th.night) {
@@ -1112,7 +1268,12 @@ function renderWorld(camDist, camX, opts) {
         let off = s.offset;
         if (s.type === 'lampL' && !off) off = -1.2; else if (s.type === 'lampR' && !off) off = 1.2;
         const sc = seg.p1.screen.scale, sx = seg.p1.screen.x + sc * off * RW * XS;
-        drawSprite(sprImg(s.type), d.w, sc, sx, seg.p1.screen.y, d.center ? -0.5 : (off < 0 ? -1 : 0), -1, seg.clip, Math.min(1, seg.fog * 1.25));
+        const ox = d.center ? -0.5 : (off < 0 ? -1 : 0);
+        if (d.sh && !th.night && seg.p1.screen.y < seg.clip) {
+          const dw = d.w * sc * XS;
+          if (dw > 3) { g.globalAlpha = 0.22 * seg.fog; g.fillStyle = '#000'; g.beginPath(); g.ellipse(sx + dw * (ox + 0.5) + dw * 0.12, seg.p1.screen.y, dw * d.sh, dw * 0.045, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+        }
+        drawSprite(sprImg(s.type), d.w, sc, sx, seg.p1.screen.y, ox, -1, seg.clip, Math.min(1, seg.fog * 1.25));
       }
       for (const r of seg.cars) {
         const rz = mod(START * SEG + r.dist, L), pct = (rz % SEG) / SEG;
@@ -1127,6 +1288,7 @@ function renderWorld(camDist, camX, opts) {
   }
   g.restore();
   if (th.rain) { drawRain(); g.fillStyle = 'rgba(40,50,60,0.12)'; g.fillRect(0, 0, W, H); }
+  if (th.sun) drawFlare();
   if (!vignette) {
     vignette = mkCanvas(W / 4, H / 4); const vg = vignette.getContext('2d');
     const gr = vg.createRadialGradient(W / 8, H / 8, H * 0.08, W / 8, H / 8, W * 0.17);
@@ -1171,6 +1333,19 @@ function drawPlayer(pSeg, pPct, p) {
     }
     g.restore();
   }
+}
+function drawFlare() {
+  const th = theme, g = ctx;
+  const sx = W * th.sun.x - (BG.off[0] * 0.03 * W) % W, sy = H * th.sun.y;
+  if (sx < -H * 0.2 || sx > W + H * 0.2) return;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const cx = W / 2, cy = H / 2, dx = cx - sx, dy = cy - sy;
+  const fl = [[0.35, 0.025, 'rgba(255,200,120,0.07)'], [0.6, 0.045, 'rgba(120,200,255,0.035)'], [0.85, 0.015, 'rgba(255,255,255,0.07)'], [1.3, 0.07, 'rgba(255,150,220,0.03)']];
+  for (const [t, r, c] of fl) { g.fillStyle = c; g.beginPath(); g.arc(sx + dx * t, sy + dy * t, H * r, 0, Math.PI * 2); g.fill(); }
+  const gr = g.createLinearGradient(sx - H * 0.6, sy, sx + H * 0.6, sy);
+  gr.addColorStop(0, 'rgba(255,240,200,0)'); gr.addColorStop(0.5, 'rgba(255,240,200,0.18)'); gr.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = gr; g.fillRect(sx - H * 0.6, sy - H * 0.004, H * 1.2, H * 0.008);
+  g.restore();
 }
 function drawSpeedLines(strength) {
   const g = ctx; g.save(); g.strokeStyle = 'rgba(255,255,255,' + (0.25 * strength) + ')'; g.lineWidth = Math.max(1, PX * 1.5);
@@ -1428,6 +1603,7 @@ function doAction(id) {
     }
     case 'paint': save.colors[garageIdx] = n; persist(); break;
     case 'toggle': {
+      AU.init();
       if (v === 'diff') save.diff = (save.diff + 1) % 3;
       else if (v === 'q') { save.q = save.q === 1 ? 0.75 : save.q === 0.75 ? 0.55 : 1; resize(); }
       else save[v] = !save[v];
@@ -1671,7 +1847,7 @@ function frame(now) {
       if (player.boost) drawSpeedLines(1);
       if (state === 'race') { drawHUD(); if (paused) drawPause(); }
       // calidad automática si el móvil va justo
-      if (!paused && raceT > 2) {
+      if (!paused && raceT > 2 && !window.__noq) {
         frameAvg = lerp(frameAvg, dt * 1000, 0.05); qCheckT += dt;
         if (qCheckT > 4 && frameAvg > 24 && save.q > 0.55) { save.q = save.q === 1 ? 0.75 : 0.55; persist(); resize(); qCheckT = 0; frameAvg = 16; }
       }

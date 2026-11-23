@@ -1,17 +1,17 @@
-# Supercar GP
+# Supercar GP 3D
 
-Juego de carreras arcade para Android: superdeportivos en 6 circuitos con mapa
-(Monza, Montecarlo, Suzuka, Spa con lluvia, Las Vegas de noche y Jarama).
+Juego de carreras de superdeportivos en 3D para Android (motor three.js r187, licencia MIT).
 
-- Gráficos vectoriales dibujados a la resolución nativa de la pantalla.
-- Garaje con 6 coches y 10 pinturas, créditos por carrera y circuitos que se desbloquean.
-- Controles táctiles, inclinación del móvil, mando Bluetooth o teclado.
+- 6 circuitos inspirados en Monza, Montecarlo, Suzuka, Spa (lluvia), Las Vegas (noche) y Jarama.
+- 6 coches 3D con pintura reflectante, 10 colores y mejoras de motor, neumáticos y nitro.
+- Modos: Campeonato (6 carreras con puntos), Carrera rápida y Contrarreloj con fantasma.
+- Derrapes y rebufo recargan el nitro; 3 cámaras; controles táctiles, inclinación o mando.
 
-## Cómo se genera la APK
-Cada cambio subido a `main` compila la APK firmada con GitHub Actions y la publica en
-**Releases → "Supercar GP (última versión)"**. La firma es siempre la misma
-(`supercargp.jks` + secreto `KEYSTORE_PASS`).
+## Código
+El juego está en `src3d/` (un archivo por parte). `python3 build.py` dentro de `src3d`
+genera `app/src/main/assets/game.js` (three.js + juego en un solo archivo).
 
 ## Actualización automática
 La app descarga sola `index.html` y `game.js` de este repositorio cuando sube `version.txt`,
-así que los cambios del juego llegan sin instalar otra APK.
+así que los cambios llegan sin instalar otra APK. Cada cambio en `main` también compila la APK
+firmada en **Releases → "Supercar GP (última versión)"**.

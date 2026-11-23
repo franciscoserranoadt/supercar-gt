@@ -2,7 +2,8 @@
 
 Juego de carreras de superdeportivos en 3D para Android (motor three.js r187, licencia MIT).
 
-- 6 circuitos inspirados en Monza, Montecarlo, Suzuka, Spa (lluvia), Las Vegas (noche) y Jarama.
+- 6 circuitos con el trazado real: Monza, Mónaco, Suzuka (con puente), Spa (lluvia), Las Vegas (noche) y Madring.
+  Trazados: github.com/bacinger/f1-circuits (licencia MIT).
 - 6 coches 3D con pintura reflectante, 10 colores y mejoras de motor, neumáticos y nitro.
 - Modos: Campeonato (6 carreras con puntos), Carrera rápida y Contrarreloj con fantasma.
 - Derrapes y rebufo recargan el nitro; 3 cámaras; controles táctiles, inclinación o mando.

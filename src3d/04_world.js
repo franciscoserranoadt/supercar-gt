@@ -165,45 +165,46 @@ function cloudTex() {
 /* ---------- Geometría de la pista ---------- */
 function computeTrack(ti) {
   const t = TRACKS[ti];
-  let pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
-  let curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
-  const sc = t.len / curve.getLength();
-  pts = t.shape.map(p => new THREE.Vector3(p[0] * sc, 0, p[1] * sc));
-  curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+  const pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
+  const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   const L = curve.getLength(), N = Math.round(L / DS), sp = curve.getSpacedPoints(N);
-  let px = new Float32Array(N), pz = new Float32Array(N);
-  for (let i = 0; i < N; i++) { px[i] = sp[i].x; pz[i] = sp[i].z; }
-  const tang = (P, Z, i) => { const a = mod(i - 1, N), b = (i + 1) % N; const dx = P[b] - P[a], dz = Z[b] - Z[a], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
-  let k = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    const t0 = tang(px, pz, i - 1), t1 = tang(px, pz, i + 1), r = [-tang(px, pz, i)[1], tang(px, pz, i)[0]];
-    k[i] = ((t1[0] - t0[0]) * r[0] + (t1[1] - t0[1]) * r[1]) / (2 * DS);
-  }
-  const ks = new Float32Array(N);
-  for (let i = 0; i < N; i++) { let s = 0; for (let m = -6; m <= 6; m++) s += k[mod(i + m, N)]; ks[i] = s / 13; }
-  // salida en la recta más larga
-  let best = 0, bestLen = 0;
-  for (let i = 0; i < N; i++) { let l = 0; while (l < N && Math.abs(ks[(i + l) % N]) < 0.0025) l++; if (l > bestLen) { bestLen = l; best = i; } if (l >= N) break; }
-  const off = mod(best + Math.min(110, Math.floor(bestLen * 0.4)) - START_I, N);
-  const rot = a => { const o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = a[(i + off) % N]; return o; };
-  px = rot(px); pz = rot(pz); const kk = rot(ks);
+  t.len = L;
+  // la muestra 0 de la curva es la línea de meta: se desplaza para que quede en START_I
+  const off = mod(-START_I, N);
+  const px = new Float32Array(N), pz = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const q = sp[(i + off) % N]; px[i] = q.x; pz[i] = q.z; }
+  const tang = i => { const a = mod(i - 1, N), b = (i + 1) % N; const dx = px[b] - px[a], dz = pz[b] - pz[a], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+  const tx = new Float32Array(N), tz = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const q = tang(i); tx[i] = q[0]; tz[i] = q[1]; }
+  const k0 = new Float32Array(N), k = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const a = mod(i - 2, N), b = (i + 2) % N; k0[i] = ((tx[b] - tx[a]) * -tz[i] + (tz[b] - tz[a]) * tx[i]) / (4 * DS); }
+  for (let i = 0; i < N; i++) { let s = 0; for (let m = -5; m <= 5; m++) s += k0[mod(i + m, N)]; k[i] = s / 11; }
   const py = new Float32Array(N);
   for (const [st, ln, hh] of t.hills) {
-    const a0 = Math.floor(st * N), L0 = Math.max(30, Math.floor(ln * N));
-    for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += hh * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
+    const a0 = Math.floor(st * N), L0 = Math.max(40, Math.floor(ln * N)), h = clamp(hh, -0.07 * L0 * DS / Math.PI, 0.07 * L0 * DS / Math.PI);
+    for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += h * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
   }
-  const tx = new Float32Array(N), tz = new Float32Array(N);
-  for (let i = 0; i < N; i++) { const q = tang(px, pz, i); tx[i] = q[0]; tz[i] = q[1]; }
-  Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k: kk });
-  // rejilla espacial para búsquedas rápidas
+  Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k });
   const cell = 30, grid = new Map();
   for (let i = 0; i < N; i++) { const key = Math.floor(px[i] / cell) + ',' + Math.floor(pz[i] / cell); if (!grid.has(key)) grid.set(key, []); grid.get(key).push(i); }
   T.grid = grid; T.cell = cell;
-  // distancia libre hasta otra parte del circuito (para no pisar pistas vecinas)
+  const far = (i, j) => { const d = Math.abs(i - j); return Math.min(d, N - d); };
+  // cruces (Suzuka): la segunda pasada sube por un puente
+  T.bridge = null;
+  if (t.bridge) {
+    let best = null;
+    for (let i = 0; i < N; i += 2) nearIdx(px[i], pz[i], 20, j => { if (j > i && far(i, j) > 150) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i]); if (!best || d < best[2]) best = [i, j, d]; } });
+    if (best) {
+      const c = best[1], Lb = 300;
+      for (let m = -Lb / 2; m <= Lb / 2; m++) py[mod(c + m, N)] += 8.5 * (1 + Math.cos(Math.PI * m / (Lb / 2))) / 2;
+      T.bridge = { c, a: mod(c - 70, N), n: 140, under: best[0] };
+    }
+  }
+  // espacio libre hasta otra parte del circuito (en 3D, para no pisar pistas vecinas)
   const clear = new Float32Array(N), wall = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     let md = 400;
-    nearIdx(px[i], pz[i], 120, j => { if (Math.abs(angDiff(0, (j - i) * 2 * Math.PI / N)) * N / (2 * Math.PI) > 50) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i]); if (d < md) md = d; } });
+    nearIdx(px[i], pz[i], 120, j => { if (far(i, j) > 60) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i], (py[j] - py[i]) * 4); if (d < md) md = d; } });
     clear[i] = md;
   }
   for (let i = 0; i < N; i++) {
@@ -229,10 +230,12 @@ function nearestTrack(x, z, r) {
 }
 // altura del terreno: pegado a la pista cerca y ondulado lejos
 function terrainY(x, z) {
-  const [i, d] = nearestTrack(x, z, 70);
+  let bd = 1e18, minY = 1e9;
+  nearIdx(x, z, 70, j => { const d = (T.px[j] - x) ** 2 + (T.pz[j] - z) ** 2; if (d < bd) bd = d; if (d < 900 && T.py[j] < minY) minY = T.py[j]; });
   const far = Math.sin(x * 0.004) * Math.cos(z * 0.0035) * 10 + Math.sin(x * 0.011 + z * 0.007) * 4 + 3;
-  if (i < 0) return far;
-  const near = T.py[i] - 0.35, w = clamp((d - ROAD_W / 2 - 12) / 50, 0, 1);
+  if (bd > 1e17) return far;
+  if (minY > 1e8) { const [i] = nearestTrack(x, z, 70); minY = T.py[i]; }
+  const d = Math.sqrt(bd), near = minY - 0.35, w = clamp((d - ROAD_W / 2 - 12) / 50, 0, 1);
   return lerp(near, Math.max(near - 2, far * (theme.night || theme.buildings ? 0.15 : 1)), w * w * (3 - 2 * w));
 }
 function trackPos(i, d) { i = mod(i, T.N); return [T.px[i] - T.tz[i] * d, T.py[i], T.pz[i] + T.tx[i] * d]; }   // derecha = (-tz, tx)
@@ -299,6 +302,7 @@ function buildTracks(ti) {
   }
   buildTerrain();
   buildWalls();
+  if (T.bridge) buildBridge();
   buildStart();
   buildScenery();
   buildMountains();
@@ -337,6 +341,17 @@ function buildWalls() {
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; world.add(m);
+  }
+}
+function buildBridge() {
+  const B = T.bridge, cm = new THREE.MeshStandardMaterial({ color: '#9a9fa6', roughness: 0.85, side: THREE.DoubleSide });
+  const ww = ROAD_W / 2 + 2.2;
+  for (const s of [-1, 1]) world.add(new THREE.Mesh(ribbon(B.a, B.n, i => [s * ww, -1.4, s * ww, 0.9, 0, 1]), cm));
+  world.add(new THREE.Mesh(ribbon(B.a, B.n, () => [-ww, -1.4, ww, -1.4, 0, 1]), cm));
+  for (let m = 20; m < B.n; m += 25) {
+    const i = mod(B.a + m, T.N), [x, y, z] = trackPos(i, 0), gy = terrainY(x, z), h = y - 1.4 - gy;
+    if (h < 1) continue;
+    for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 1.2), cm); const [px2, , pz2] = trackPos(i, s * (ww - 1)); p.position.set(px2, gy + h / 2, pz2); p.castShadow = true; world.add(p); }
   }
 }
 function placeAt(obj, i, d, yOff) { const [x, y, z] = trackPos(i, d); obj.position.set(x, y + (yOff || 0), z); obj.rotation.y = Math.atan2(-T.tz[i], T.tx[i]); return obj; }

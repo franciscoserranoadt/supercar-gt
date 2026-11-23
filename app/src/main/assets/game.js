@@ -81234,26 +81234,21 @@ const THEMES = {
             fog: ['#f3dcb0', 250, 2600], grass: '#b49456', grass2: '#bf9f60', mount: '#b47a4c', trees: ['olive', 'bush'], wall: 'armco', gap: 12, exposure: 1.0 }
 };
 
-// Forma del circuito vista desde arriba (sentido de la marcha), longitud en metros y lomas [inicio, largo, altura m]
+// Trazados reales (datos: github.com/bacinger/f1-circuits, licencia MIT), en metros, en el sentido de la carrera.
+// El primer punto es la línea de meta. Desniveles: [inicio, largo, altura m] como fracción de la vuelta.
 const TRACKS = [
-  { name: 'Monza', country: 'Italia', theme: 'park', laps: 3, len: 3400,
-    shape: [[0,0],[560,0],[600,8],[625,-8],[660,0],[800,10],[900,50],[970,120],[1010,220],[1020,300],[1034,318],[1012,338],[1030,358],[1042,420],[1020,470],[975,500],[900,520],[760,545],[680,558],[655,580],[625,558],[595,582],[560,570],[200,570],[110,565],[45,530],[5,470],[-15,380],[-20,250],[-15,120],[-8,40]],
-    hills: [[0.3, 0.12, 4], [0.62, 0.1, -3]] },
-  { name: 'Montecarlo', country: 'Mónaco', theme: 'coast', laps: 3, len: 2500,
-    shape: [[0,0],[130,0],[160,-15],[175,-45],[230,-120],[270,-150],[300,-145],[320,-125],[330,-100],[345,-82],[362,-92],[376,-76],[362,-56],[340,-40],[332,-15],[350,10],[420,40],[520,70],[560,90],[575,110],[565,126],[545,120],[522,140],[482,150],[445,145],[422,166],[396,170],[380,150],[340,140],[300,150],[250,140],[200,135],[150,122],[100,110],[60,95],[28,70],[6,38]],
-    hills: [[0.06, 0.3, 14], [0.62, 0.12, -4]] },
-  { name: 'Suzuka', country: 'Japón', theme: 'sakura', laps: 3, len: 3300,
-    shape: [[0,0],[300,0],[350,12],[380,45],[372,85],[340,105],[310,96],[285,118],[255,106],[228,126],[205,145],[195,175],[215,205],[250,222],[262,250],[240,268],[195,262],[150,245],[95,244],[62,266],[70,298],[108,304],[160,325],[215,352],[240,385],[215,415],[160,410],[105,382],[40,330],[-30,250],[-70,190],[-80,140],[-60,110],[-75,80],[-60,40],[-35,10]],
-    hills: [[0.05, 0.18, 8], [0.45, 0.25, -7], [0.75, 0.12, 5]] },
-  { name: 'Spa', country: 'Bélgica', theme: 'rain', laps: 3, len: 3800,
-    shape: [[0,0],[140,0],[170,15],[165,45],[135,52],[110,62],[95,90],[110,115],[104,140],[106,300],[110,420],[125,440],[150,435],[170,455],[230,520],[252,558],[232,585],[195,582],[150,600],[110,630],[60,640],[20,622],[-10,600],[-42,612],[-70,500],[-80,300],[-72,120],[-62,62],[-45,46],[-56,30],[-40,14],[-20,2]],
-    hills: [[0.04, 0.07, -8], [0.09, 0.1, 12], [0.35, 0.25, -12], [0.7, 0.2, 7]] },
-  { name: 'Las Vegas', country: 'EE. UU.', theme: 'neon', laps: 3, len: 3000,
-    shape: [[0,0],[300,0],[320,-20],[330,-60],[350,-80],[600,-80],[620,-60],[620,300],[600,320],[400,320],[380,340],[360,360],[100,360],[80,340],[80,300],[60,280],[-40,280],[-60,260],[-60,40],[-40,0]],
-    hills: [] },
-  { name: 'Jarama', country: 'España', theme: 'dry', laps: 3, len: 2600,
-    shape: [[0,0],[260,0],[300,20],[310,60],[280,90],[240,95],[215,120],[230,160],[275,185],[320,200],[350,240],[330,275],[280,280],[240,260],[190,265],[150,300],[110,320],[70,305],[60,260],[90,220],[80,180],[40,160],[0,170],[-40,150],[-55,110],[-40,60],[-25,20]],
-    hills: [[0.1, 0.2, 9], [0.45, 0.2, -7], [0.72, 0.15, 5]] }
+  { name: 'Monza', country: 'Italia', theme: 'park', laps: 2, hills: [[0.42, 0.14, 3]],
+    shape: [[-417.7,491.4],[-381.2,65.1],[-364.6,-113.7],[-362.8,-121.0],[-357.6,-125.2],[-351.3,-126.2],[-343.4,-125.2],[-336.0,-124.6],[-329.2,-125.2],[-324.5,-128.8],[-320.8,-134.0],[-319.9,-138.7],[-319.9,-143.8],[-345.7,-241.3],[-349.4,-267.9],[-350.8,-291.9],[-348.9,-317.9],[-339.3,-445.1],[-335.5,-465.9],[-330.9,-485.2],[-324.0,-506.0],[-314.8,-528.4],[-304.2,-550.3],[-288.6,-574.8],[-272.5,-595.1],[-250.8,-618.1],[-227.2,-638.4],[-201.0,-657.1],[-172.9,-673.2],[-141.1,-688.9],[-109.3,-699.9],[-74.3,-709.7],[-34.6,-716.6],[5.9,-720.2],[164.0,-733.7],[357.5,-745.2],[369.0,-746.2],[375.0,-749.4],[380.1,-754.6],[386.5,-777.0],[389.3,-783.2],[393.9,-787.4],[401.7,-790.0],[428.0,-794.7],[456.6,-800.9],[497.1,-813.9],[678.2,-874.4],[693.8,-878.1],[708.6,-878.1],[722.9,-875.4],[733.0,-871.3],[742.7,-865.6],[751.9,-859.3],[763.5,-846.8],[769.9,-836.9],[774.5,-824.9],[776.8,-811.4],[784.6,-726.0],[799.4,-580.0],[799.0,-567.0],[796.6,-558.6],[793.0,-551.3],[787.0,-546.1],[775.9,-538.8],[657.5,-475.2],[561.2,-421.6],[501.2,-388.8],[472.2,-372.1],[439.5,-349.2],[416.0,-331.4],[395.7,-313.7],[290.6,-224.1],[216.1,-156.9],[58.4,-19.4],[-36.5,63.5],[-49.4,76.6],[-54.5,84.9],[-55.4,93.1],[-55.4,103.1],[-52.1,125.0],[-51.2,136.9],[-51.2,154.2],[-52.6,163.6],[-56.4,175.5],[-61.9,189.5],[-71.1,203.7],[-83.5,218.3],[-97.8,230.2],[-109.3,239.1],[-115.3,245.9],[-119.9,255.2],[-124.1,272.4],[-133.7,351.1],[-143.9,435.0],[-222.2,1187.4],[-225.5,1214.5],[-228.6,1227.1],[-235.1,1240.0],[-243.9,1250.5],[-254.0,1259.9],[-268.3,1269.2],[-283.9,1274.9],[-301.9,1278.1],[-317.2,1277.0],[-331.4,1273.9],[-348.0,1267.6],[-364.1,1260.3],[-376.1,1252.1],[-390.4,1241.1],[-406.5,1223.9],[-417.6,1208.3],[-427.2,1191.6],[-435.6,1171.8],[-443.4,1149.9],[-449.4,1127.5],[-452.2,1108.2],[-455.4,1079.1],[-455.8,1049.9],[-456.3,1022.2],[-457.7,967.5],[-458.6,919.5],[-457.7,867.5],[-451.7,799.3],[-429.1,583.5]] },
+  { name: 'Mónaco', country: 'Montecarlo', theme: 'coast', laps: 3, hills: [[0.05, 0.42, 24]],
+    shape: [[152.9,-249.9],[151.3,-259.8],[153.6,-268.8],[159.4,-281.1],[164.8,-289.7],[181.9,-311.1],[268.5,-428.0],[274.6,-436.4],[283.5,-438.9],[294.3,-435.8],[301.9,-429.6],[307.4,-419.9],[308.5,-409.0],[308.7,-399.9],[309.6,-392.5],[314.1,-383.6],[319.4,-376.9],[329.1,-363.3],[335.7,-351.3],[338.3,-344.0],[341.6,-339.6],[346.8,-338.2],[352.8,-340.0],[357.3,-344.6],[358.7,-351.3],[355.7,-356.9],[348.1,-362.4],[325.5,-390.9],[322.3,-397.8],[322.2,-404.4],[323.9,-409.5],[326.4,-414.3],[337.0,-419.7],[353.4,-423.9],[362.3,-427.2],[371.5,-430.8],[384.2,-435.3],[398.0,-436.3],[405.3,-432.6],[408.1,-421.3],[405.5,-355.5],[395.3,-287.7],[384.7,-244.6],[372.8,-213.9],[352.6,-178.7],[329.2,-149.0],[295.5,-112.4],[247.1,-83.0],[218.3,-68.9],[162.8,-43.2],[125.5,-30.4],[70.4,-17.4],[35.0,-11.9],[16.1,-8.4],[12.9,-2.9],[12.7,1.8],[11.5,7.3],[9.1,12.8],[1.2,15.5],[-10.1,17.4],[-22.6,10.3],[-29.4,9.9],[-128.6,22.8],[-177.9,29.9],[-223.3,37.0],[-235.9,38.8],[-244.2,40.3],[-250.3,46.5],[-259.7,65.0],[-267.8,83.1],[-274.2,101.1],[-277.0,113.9],[-280.0,136.2],[-280.3,174.5],[-279.9,184.0],[-277.0,190.5],[-271.4,196.8],[-258.9,205.9],[-250.6,213.5],[-247.0,221.7],[-245.5,233.5],[-231.4,314.9],[-227.7,329.1],[-226.6,333.7],[-226.9,339.7],[-230.6,344.6],[-238.5,350.1],[-246.5,354.0],[-248.3,359.5],[-246.8,371.1],[-237.7,397.5],[-229.4,417.4],[-221.0,433.1],[-206.5,453.7],[-188.3,471.9],[-175.0,479.6],[-160.0,486.5],[-152.5,489.8],[-148.8,494.0],[-144.4,507.0],[-146.5,513.8],[-153.3,517.8],[-183.3,525.7],[-200.0,528.3],[-211.0,528.5],[-220.8,527.1],[-227.0,522.5],[-230.8,518.6],[-231.0,509.5],[-232.4,502.2],[-235.3,493.3],[-252.2,472.6],[-264.6,452.8],[-274.2,438.0],[-284.4,409.9],[-307.0,331.8],[-313.2,306.6],[-317.6,279.6],[-323.2,240.2],[-327.6,189.1],[-327.6,155.7],[-326.2,130.1],[-323.4,103.6],[-318.4,85.2],[-312.8,68.6],[-310.0,58.4],[-308.6,49.5],[-309.3,35.9],[-309.5,27.5],[-306.8,22.5],[-299.8,19.2],[-282.8,15.1],[-267.5,14.4],[-246.7,11.9],[-217.7,8.2],[-191.9,3.7],[-126.5,-15.4],[-89.9,-25.4],[-56.3,-30.8],[-33.3,-32.7],[-15.4,-39.1],[36.5,-63.5],[59.2,-72.8],[92.5,-80.2],[120.2,-84.1],[146.7,-88.5],[161.5,-93.7],[179.6,-105.0],[195.3,-121.2],[204.2,-134.9],[208.1,-149.3],[207.5,-164.3],[204.9,-178.5],[199.3,-194.1],[191.8,-208.9],[180.0,-217.9],[168.8,-228.4],[163.3,-233.2],[158.3,-238.3]] },
+  { name: 'Suzuka', country: 'Japón', theme: 'sakura', laps: 2, hills: [[0.04, 0.3, 9], [0.52, 0.22, -6]], bridge: true,
+    shape: [[685.8,137.6],[806.9,282.4],[948.6,454.9],[961.6,473.1],[968.8,492.1],[972.6,509.2],[972.3,526.0],[970.2,539.0],[953.6,589.7],[945.8,603.0],[934.4,613.0],[924.8,618.5],[907.5,622.7],[891.8,622.1],[874.5,616.4],[858.4,603.8],[842.1,579.2],[758.5,451.8],[742.7,438.4],[729.1,434.1],[708.5,430.5],[665.3,430.2],[643.6,424.0],[628.2,413.3],[616.6,399.3],[611.1,385.5],[591.7,312.2],[583.5,293.4],[570.6,277.2],[555.5,266.3],[536.5,257.4],[517.0,253.8],[466.8,253.0],[443.6,248.6],[427.7,241.1],[411.2,228.5],[399.2,210.9],[391.8,193.0],[388.4,176.1],[388.6,159.9],[391.7,146.2],[416.4,79.2],[420.1,65.6],[420.7,47.7],[418.1,35.9],[411.6,18.8],[401.9,4.2],[383.4,-8.9],[360.8,-21.0],[334.0,-34.4],[310.5,-43.8],[292.9,-48.7],[268.3,-52.7],[240.3,-53.2],[218.3,-52.3],[199.9,-47.4],[185.0,-41.1],[161.8,-31.3],[137.4,-17.7],[109.4,5.1],[87.5,28.2],[-4.7,139.2],[-9.5,145.6],[-24.2,149.0],[-158.9,161.0],[-167.5,159.9],[-176.8,153.7],[-180.5,143.2],[-182.2,134.4],[-202.6,50.8],[-229.9,-106.1],[-235.1,-135.0],[-236.4,-149.6],[-235.0,-164.6],[-232.0,-180.2],[-225.8,-196.3],[-218.8,-212.4],[-197.0,-261.9],[-194.8,-269.5],[-196.4,-276.5],[-200.5,-282.9],[-207.5,-287.6],[-215.7,-290.2],[-223.5,-289.6],[-232.5,-283.7],[-239.9,-273.0],[-271.6,-218.7],[-297.4,-177.7],[-314.2,-153.3],[-328.1,-137.3],[-340.0,-127.1],[-360.6,-111.0],[-382.2,-99.5],[-404.9,-92.8],[-444.4,-87.0],[-481.7,-85.5],[-509.9,-87.6],[-543.4,-94.9],[-580.1,-105.1],[-621.2,-120.4],[-647.2,-132.3],[-669.9,-145.9],[-690.9,-161.5],[-713.1,-181.3],[-736.1,-206.5],[-751.2,-228.5],[-764.9,-252.6],[-798.5,-341.5],[-816.5,-380.4],[-825.6,-396.0],[-838.0,-407.5],[-854.3,-414.8],[-873.8,-418.4],[-897.0,-417.9],[-918.6,-414.8],[-939.7,-410.1],[-960.3,-401.7],[-977.1,-389.0],[-987.2,-372.9],[-991.2,-357.1],[-990.0,-337.2],[-985.4,-322.3],[-978.7,-307.4],[-967.3,-294.9],[-944.7,-273.9],[-916.5,-250.6],[-888.9,-226.6],[-853.9,-200.3],[-813.9,-173.2],[-773.0,-147.8],[-727.2,-126.1],[-686.3,-105.4],[-644.3,-89.4],[-576.0,-66.0],[-500.9,-36.9],[-410.0,-5.3],[-319.8,23.0],[-257.4,44.4],[-176.8,75.0],[-158.3,79.7],[-139.9,80.2],[-120.5,76.6],[-101.6,71.4],[-67.5,58.4],[-36.2,42.8],[-9.8,26.6],[17.4,5.6],[68.3,-41.7],[138.0,-106.2],[157.3,-122.2],[171.1,-131.8],[183.7,-140.1],[192.7,-145.4],[197.5,-145.8],[203.9,-143.2],[219.7,-129.2],[231.0,-119.8],[240.2,-117.2],[248.9,-118.8],[259.1,-125.6],[275.9,-140.7],[294.8,-154.2],[315.9,-163.1],[341.7,-165.3],[365.7,-163.9],[391.1,-158.7],[416.5,-148.9],[438.1,-138.6],[465.1,-120.4],[489.4,-98.0],[514.4,-70.3]] },
+  { name: 'Spa-Francorchamps', country: 'Bélgica', theme: 'rain', laps: 2, hills: [[0.015, 0.1, -10], [0.07, 0.3, 18], [0.33, 0.4, -18], [0.72, 0.24, 7]],
+    shape: [[-258.9,-1060.7],[-372.4,-1257.7],[-373.6,-1266.5],[-368.6,-1274.4],[-358.1,-1278.0],[-346.4,-1274.8],[-309.0,-1256.1],[-218.3,-1212.9],[-174.7,-1186.3],[-129.3,-1152.9],[-88.6,-1119.1],[-56.4,-1084.1],[117.0,-878.9],[129.2,-867.4],[150.1,-854.4],[187.5,-830.5],[203.8,-814.3],[217.7,-792.4],[226.5,-772.5],[232.4,-750.2],[237.5,-709.0],[240.4,-694.4],[245.4,-680.9],[255.0,-663.2],[340.7,-527.1],[395.2,-440.7],[410.3,-408.4],[420.0,-384.4],[431.3,-345.8],[499.7,-108.7],[604.7,251.3],[629.0,337.8],[630.3,351.9],[627.7,367.5],[619.4,380.0],[607.2,390.5],[591.6,398.8],[582.4,407.6],[576.1,418.0],[571.1,433.7],[571.9,449.3],[592.9,542.6],[592.5,558.7],[589.1,573.3],[577.8,589.4],[564.3,600.4],[325.2,764.5],[310.1,770.8],[295.0,771.3],[279.0,766.6],[266.0,757.2],[256.7,743.7],[253.0,730.2],[252.1,715.6],[256.7,702.0],[265.1,687.9],[277.3,678.1],[381.8,614.0],[393.2,602.5],[399.4,591.0],[402.0,577.5],[400.7,560.8],[357.4,434.7],[344.0,383.2],[313.4,224.2],[298.3,133.0],[295.0,117.4],[287.4,100.7],[277.3,87.1],[262.2,72.5],[245.4,61.6],[227.0,54.3],[207.6,51.2],[145.1,47.0],[121.2,49.7],[99.3,55.9],[77.1,65.3],[59.1,77.3],[38.1,96.5],[24.7,115.8],[10.0,143.4],[-49.2,290.4],[-102.1,421.2],[-113.5,441.5],[-126.9,455.6],[-145.3,466.0],[-163.8,471.2],[-181.0,471.7],[-198.2,468.1],[-212.9,461.3],[-237.3,445.6],[-253.2,438.9],[-272.5,435.8],[-291.8,437.9],[-309.4,443.5],[-324.5,454.0],[-334.2,466.0],[-346.0,482.1],[-442.9,633.2],[-452.5,642.0],[-464.3,648.4],[-478.6,651.4],[-494.5,650.5],[-508.3,644.2],[-573.9,596.7],[-612.4,568.7],[-622.1,556.2],[-632.1,541.0],[-638.0,526.4],[-642.2,509.2],[-643.1,491.5],[-640.2,470.2],[-633.4,451.9],[-624.6,428.5],[-611.6,393.0],[-589.0,352.9],[-564.1,317.9],[-526.4,275.8],[-463.5,214.8],[-426.5,186.2],[-395.0,167.9],[-233.0,84.0],[-209.5,69.5],[-187.3,52.2],[-166.7,33.0],[-149.1,12.1],[-132.7,-9.8],[-110.9,-49.8],[-93.3,-88.4],[-53.0,-177.5],[-45.9,-196.8],[-41.6,-217.6],[-40.9,-243.7],[-45.0,-267.1],[-68.9,-328.2],[-95.0,-395.4],[-126.4,-479.3],[-134.4,-510.4],[-142.0,-547.5],[-146.6,-581.8],[-149.6,-611.0],[-158.8,-746.0],[-157.1,-754.8],[-151.6,-761.1],[-143.2,-763.2],[-129.0,-761.1],[-114.2,-761.1],[-104.2,-763.2],[-97.5,-770.5],[-95.8,-778.8],[-100.0,-789.8],[-151.6,-873.7]] },
+  { name: 'Las Vegas', country: 'EE. UU.', theme: 'neon', laps: 2, hills: [],
+    shape: [[409.7,728.8],[464.8,667.2],[476.5,654.3],[484.8,640.2],[487.6,623.5],[480.5,608.5],[468.9,598.9],[448.1,591.0],[428.2,587.8],[409.0,588.9],[391.1,594.3],[351.9,617.7],[315.7,653.4],[301.8,662.6],[271.3,669.3],[254.8,669.0],[225.0,659.0],[208.6,650.0],[193.3,637.0],[167.9,603.0],[157.7,574.1],[150.7,-280.6],[156.0,-293.5],[166.3,-300.0],[343.8,-296.7],[397.1,-297.0],[424.9,-303.4],[436.1,-313.1],[467.5,-343.5],[481.6,-363.2],[492.4,-384.6],[500.2,-403.3],[504.9,-427.6],[508.1,-456.5],[507.2,-473.6],[497.5,-479.6],[471.8,-482.5],[462.8,-488.2],[455.1,-500.0],[452.0,-518.4],[453.5,-531.9],[478.4,-574.7],[482.7,-586.1],[493.1,-605.8],[489.3,-626.4],[469.1,-639.7],[431.5,-643.9],[150.0,-651.0],[46.1,-666.0],[11.7,-682.5],[-26.2,-721.3],[-58.8,-786.0],[-108.6,-902.2],[-140.6,-935.7],[-173.8,-958.4],[-207.5,-970.8],[-260.3,-987.7],[-320.2,-999.6],[-328.4,-997.6],[-336.2,-991.7],[-342.3,-971.3],[-348.5,-957.4],[-410.6,-836.8],[-449.3,-765.1],[-469.5,-728.7],[-490.1,-693.6],[-525.8,-632.1],[-562.5,-549.3],[-582.0,-486.7],[-603.3,-414.8],[-617.6,-363.2],[-628.3,-312.0],[-636.8,-260.0],[-645.9,-183.8],[-648.1,-139.4],[-650.5,-86.5],[-649.5,56.9],[-648.9,138.8],[-648.7,201.0],[-660.6,525.6],[-664.2,692.2],[-664.3,775.3],[-667.6,875.5],[-661.9,883.5],[-654.2,886.2],[-635.6,885.9],[-622.0,891.1],[-591.2,921.7],[-564.3,936.9],[-528.5,943.9],[-372.7,947.2],[-168.8,944.8],[-1.1,945.8],[80.8,944.7],[147.9,935.4],[218.0,922.1],[236.3,913.8],[251.0,904.6],[262.8,893.6]] },
+  { name: 'Madring', country: 'España · Madrid', theme: 'dry', laps: 2, hills: [[0.28, 0.2, 6], [0.62, 0.18, -4]],
+    shape: [[388.2,845.5],[201.1,878.2],[189.9,884.9],[188.1,927.2],[182.5,934.0],[152.3,939.5],[117.2,944.9],[86.3,943.2],[48.0,927.2],[20.9,901.5],[-122.8,672.7],[-200.6,552.6],[-224.0,505.1],[-238.2,472.7],[-245.0,453.0],[-261.0,392.5],[-268.4,327.5],[-266.0,278.5],[-259.2,225.8],[-240.6,176.1],[-222.2,145.5],[-214.7,135.1],[-214.7,126.6],[-225.2,120.4],[-233.9,111.9],[-232.6,101.4],[-225.2,91.0],[-220.9,78.7],[-223.4,54.3],[-236.3,9.5],[-247.4,-21.1],[-263.5,-46.2],[-277.0,-64.5],[-284.4,-86.0],[-303.6,-163.2],[-314.1,-192.0],[-327.0,-206.0],[-327.6,-215.8],[-316.5,-224.5],[-296.8,-239.4],[-286.3,-256.6],[-286.3,-273.8],[-293.1,-294.5],[-324.0,-350.9],[-326.4,-366.5],[-327.6,-473.1],[-324.6,-514.7],[-312.2,-532.2],[-285.1,-553.0],[-254.9,-577.5],[-243.1,-600.9],[-243.8,-629.0],[-247.4,-645.8],[-284.4,-734.6],[-288.1,-764.0],[-285.7,-794.1],[-272.7,-821.1],[-253.0,-844.3],[-223.4,-859.0],[-191.3,-863.8],[-156.7,-862.1],[-122.8,-844.9],[-90.2,-816.1],[-70.4,-783.0],[-64.8,-744.4],[-67.3,-709.5],[-80.8,-672.8],[-101.2,-637.6],[-111.7,-620.4],[-213.5,-494.3],[-264.1,-417.0],[-268.4,-403.5],[-264.7,-384.6],[-243.1,-364.4],[-170.3,-313.9],[-140.7,-288.1],[-127.8,-266.7],[-121.6,-244.7],[-121.6,-135.3],[-117.9,-113.8],[-106.2,-88.7],[-88.9,-62.7],[-70.4,-42.5],[-45.1,-27.2],[-15.5,-17.4],[120.9,-17.4],[144.2,-27.8],[168.3,-41.3],[180.1,-44.4],[190.6,-35.1],[227.6,19.9],[273.8,100.5],[283.0,120.8],[294.8,137.9],[316.4,151.4],[337.3,155.0],[417.5,144.6],[455.8,145.3],[494.7,158.7],[520.6,184.1],[532.9,207.4],[577.3,454.0],[581.6,484.3],[587.2,499.0],[603.2,500.9],[626.7,483.7],[640.8,480.0],[735.8,468.4],[744.5,477.6],[763.0,539.5],[782.8,620.6],[801.2,728.4],[803.1,756.6],[787.7,774.4],[763.6,779.9]] }
 ];
 const ROAD_W = 13;         // ancho de la pista (m)
 const KERB_W = 1.4;
@@ -81427,45 +81422,46 @@ function cloudTex() {
 /* ---------- Geometría de la pista ---------- */
 function computeTrack(ti) {
   const t = TRACKS[ti];
-  let pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
-  let curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
-  const sc = t.len / curve.getLength();
-  pts = t.shape.map(p => new THREE.Vector3(p[0] * sc, 0, p[1] * sc));
-  curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+  const pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
+  const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   const L = curve.getLength(), N = Math.round(L / DS), sp = curve.getSpacedPoints(N);
-  let px = new Float32Array(N), pz = new Float32Array(N);
-  for (let i = 0; i < N; i++) { px[i] = sp[i].x; pz[i] = sp[i].z; }
-  const tang = (P, Z, i) => { const a = mod(i - 1, N), b = (i + 1) % N; const dx = P[b] - P[a], dz = Z[b] - Z[a], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
-  let k = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    const t0 = tang(px, pz, i - 1), t1 = tang(px, pz, i + 1), r = [-tang(px, pz, i)[1], tang(px, pz, i)[0]];
-    k[i] = ((t1[0] - t0[0]) * r[0] + (t1[1] - t0[1]) * r[1]) / (2 * DS);
-  }
-  const ks = new Float32Array(N);
-  for (let i = 0; i < N; i++) { let s = 0; for (let m = -6; m <= 6; m++) s += k[mod(i + m, N)]; ks[i] = s / 13; }
-  // salida en la recta más larga
-  let best = 0, bestLen = 0;
-  for (let i = 0; i < N; i++) { let l = 0; while (l < N && Math.abs(ks[(i + l) % N]) < 0.0025) l++; if (l > bestLen) { bestLen = l; best = i; } if (l >= N) break; }
-  const off = mod(best + Math.min(110, Math.floor(bestLen * 0.4)) - START_I, N);
-  const rot = a => { const o = new Float32Array(N); for (let i = 0; i < N; i++) o[i] = a[(i + off) % N]; return o; };
-  px = rot(px); pz = rot(pz); const kk = rot(ks);
+  t.len = L;
+  // la muestra 0 de la curva es la línea de meta: se desplaza para que quede en START_I
+  const off = mod(-START_I, N);
+  const px = new Float32Array(N), pz = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const q = sp[(i + off) % N]; px[i] = q.x; pz[i] = q.z; }
+  const tang = i => { const a = mod(i - 1, N), b = (i + 1) % N; const dx = px[b] - px[a], dz = pz[b] - pz[a], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
+  const tx = new Float32Array(N), tz = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const q = tang(i); tx[i] = q[0]; tz[i] = q[1]; }
+  const k0 = new Float32Array(N), k = new Float32Array(N);
+  for (let i = 0; i < N; i++) { const a = mod(i - 2, N), b = (i + 2) % N; k0[i] = ((tx[b] - tx[a]) * -tz[i] + (tz[b] - tz[a]) * tx[i]) / (4 * DS); }
+  for (let i = 0; i < N; i++) { let s = 0; for (let m = -5; m <= 5; m++) s += k0[mod(i + m, N)]; k[i] = s / 11; }
   const py = new Float32Array(N);
   for (const [st, ln, hh] of t.hills) {
-    const a0 = Math.floor(st * N), L0 = Math.max(30, Math.floor(ln * N));
-    for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += hh * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
+    const a0 = Math.floor(st * N), L0 = Math.max(40, Math.floor(ln * N)), h = clamp(hh, -0.07 * L0 * DS / Math.PI, 0.07 * L0 * DS / Math.PI);
+    for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += h * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
   }
-  const tx = new Float32Array(N), tz = new Float32Array(N);
-  for (let i = 0; i < N; i++) { const q = tang(px, pz, i); tx[i] = q[0]; tz[i] = q[1]; }
-  Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k: kk });
-  // rejilla espacial para búsquedas rápidas
+  Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k });
   const cell = 30, grid = new Map();
   for (let i = 0; i < N; i++) { const key = Math.floor(px[i] / cell) + ',' + Math.floor(pz[i] / cell); if (!grid.has(key)) grid.set(key, []); grid.get(key).push(i); }
   T.grid = grid; T.cell = cell;
-  // distancia libre hasta otra parte del circuito (para no pisar pistas vecinas)
+  const far = (i, j) => { const d = Math.abs(i - j); return Math.min(d, N - d); };
+  // cruces (Suzuka): la segunda pasada sube por un puente
+  T.bridge = null;
+  if (t.bridge) {
+    let best = null;
+    for (let i = 0; i < N; i += 2) nearIdx(px[i], pz[i], 20, j => { if (j > i && far(i, j) > 150) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i]); if (!best || d < best[2]) best = [i, j, d]; } });
+    if (best) {
+      const c = best[1], Lb = 300;
+      for (let m = -Lb / 2; m <= Lb / 2; m++) py[mod(c + m, N)] += 8.5 * (1 + Math.cos(Math.PI * m / (Lb / 2))) / 2;
+      T.bridge = { c, a: mod(c - 70, N), n: 140, under: best[0] };
+    }
+  }
+  // espacio libre hasta otra parte del circuito (en 3D, para no pisar pistas vecinas)
   const clear = new Float32Array(N), wall = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     let md = 400;
-    nearIdx(px[i], pz[i], 120, j => { if (Math.abs(angDiff(0, (j - i) * 2 * Math.PI / N)) * N / (2 * Math.PI) > 50) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i]); if (d < md) md = d; } });
+    nearIdx(px[i], pz[i], 120, j => { if (far(i, j) > 60) { const d = Math.hypot(px[j] - px[i], pz[j] - pz[i], (py[j] - py[i]) * 4); if (d < md) md = d; } });
     clear[i] = md;
   }
   for (let i = 0; i < N; i++) {
@@ -81491,10 +81487,12 @@ function nearestTrack(x, z, r) {
 }
 // altura del terreno: pegado a la pista cerca y ondulado lejos
 function terrainY(x, z) {
-  const [i, d] = nearestTrack(x, z, 70);
+  let bd = 1e18, minY = 1e9;
+  nearIdx(x, z, 70, j => { const d = (T.px[j] - x) ** 2 + (T.pz[j] - z) ** 2; if (d < bd) bd = d; if (d < 900 && T.py[j] < minY) minY = T.py[j]; });
   const far = Math.sin(x * 0.004) * Math.cos(z * 0.0035) * 10 + Math.sin(x * 0.011 + z * 0.007) * 4 + 3;
-  if (i < 0) return far;
-  const near = T.py[i] - 0.35, w = clamp((d - ROAD_W / 2 - 12) / 50, 0, 1);
+  if (bd > 1e17) return far;
+  if (minY > 1e8) { const [i] = nearestTrack(x, z, 70); minY = T.py[i]; }
+  const d = Math.sqrt(bd), near = minY - 0.35, w = clamp((d - ROAD_W / 2 - 12) / 50, 0, 1);
   return lerp(near, Math.max(near - 2, far * (theme.night || theme.buildings ? 0.15 : 1)), w * w * (3 - 2 * w));
 }
 function trackPos(i, d) { i = mod(i, T.N); return [T.px[i] - T.tz[i] * d, T.py[i], T.pz[i] + T.tx[i] * d]; }   // derecha = (-tz, tx)
@@ -81561,6 +81559,7 @@ function buildTracks(ti) {
   }
   buildTerrain();
   buildWalls();
+  if (T.bridge) buildBridge();
   buildStart();
   buildScenery();
   buildMountains();
@@ -81599,6 +81598,17 @@ function buildWalls() {
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; world.add(m);
+  }
+}
+function buildBridge() {
+  const B = T.bridge, cm = new THREE.MeshStandardMaterial({ color: '#9a9fa6', roughness: 0.85, side: THREE.DoubleSide });
+  const ww = ROAD_W / 2 + 2.2;
+  for (const s of [-1, 1]) world.add(new THREE.Mesh(ribbon(B.a, B.n, i => [s * ww, -1.4, s * ww, 0.9, 0, 1]), cm));
+  world.add(new THREE.Mesh(ribbon(B.a, B.n, () => [-ww, -1.4, ww, -1.4, 0, 1]), cm));
+  for (let m = 20; m < B.n; m += 25) {
+    const i = mod(B.a + m, T.N), [x, y, z] = trackPos(i, 0), gy = terrainY(x, z), h = y - 1.4 - gy;
+    if (h < 1) continue;
+    for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 1.2), cm); const [px2, , pz2] = trackPos(i, s * (ww - 1)); p.position.set(px2, gy + h / 2, pz2); p.castShadow = true; world.add(p); }
   }
 }
 function placeAt(obj, i, d, yOff) { const [x, y, z] = trackPos(i, d); obj.position.set(x, y + (yOff || 0), z); obj.rotation.y = Math.atan2(-T.tz[i], T.tx[i]); return obj; }
@@ -81984,7 +81994,7 @@ function startRace(ti, md) {
   const pm = save.car, st = carStats(pm);
   const pslot = mode === 'trial' ? 0 : 6;
   player = makeRacer(pm, PAINT[save.colors[pm] ?? CARS[pm].paint], 'TÚ', pslot, true, st);
-  Object.assign(player, { steer: 0, drift: 0, nitro: st.nitro, boost: false, lapStart: 0, lapTimes: [], idx: 0, sLast: 0, base: 0, stuck: 0, draft: 0, wrong: 0, crashCD: 0, latA: 0, lonA: 0, rough: 0 });
+  Object.assign(player, { vx: 0, vy: 0, r: 0, ax: 0, steer: 0, drift: 0, nitro: st.nitro, boost: false, lapStart: 0, lapTimes: [], idx: 0, sLast: 0, base: 0, stuck: 0, draft: 0, wrong: 0, crashCD: 0, latA: 0, lonA: 0, rough: 0 });
   initPlayerProgress();
   racers = [player];
   if (mode !== 'trial') {
@@ -81993,7 +82003,7 @@ function startRace(ti, md) {
     field.forEach((f, k) => {
       const r = makeRacer(f.m, f.color, f.name, slots[k], false);
       const baseTop = ([300, 318, 334][save.diff] + ti * 3) / 3.6;
-      r.top = baseTop * f.skill; r.grip = [18.5, 20.5, 22][save.diff] * (0.96 + (f.skill - 0.93) * 1.2); r.lane = (k % 3 - 1) * 1.6; r.idx = 0;
+      r.top = baseTop * f.skill; r.grip = [1.15, 1.28, 1.4][save.diff] * (0.97 + (f.skill - 0.95) * 1.0); if (theme.rain) r.grip *= 0.82; r.lane = (k % 3 - 1) * 1.6; r.idx = 0;
       rivals.push(r); racers.push(r);
     });
   } else setupGhost(ti);
@@ -82032,76 +82042,113 @@ function updateProgress(r) {
   r.sLast = s; r.prog = r.base + s - S0();
 }
 
-/* ---------- física del jugador ---------- */
+/* ---------- física del jugador: modelo de bicicleta con neumáticos ---------- */
+const PHY = { m: 1450, Iz: 2350, a: 1.22, b: 1.48, h: 0.46, g: 9.81, rho: 1.2, ClA: 2.6, B: 14, C: 1.6 };
+function tireF(alpha, Fz, mu) { return mu * Fz * Math.sin(PHY.C * Math.atan(PHY.B * alpha)); }
 function updatePlayer(dt) {
   const p = player, st = p.stats, go = raceT >= 0 && !p.finished;
   let steerIn = input.steer, gas, brake = input.brake, nit = input.nitro;
   if (p.finished) { // conducción automática tras la meta
     const ah = sampleAt(p.prog + S0() + 25), want = headingOf(ah.tx, ah.tz) + p.d * 0.02;
-    steerIn = clamp(-angDiff(p.yaw, want) * 3, -1, 1); gas = p.v < 30; brake = false; nit = false;
+    steerIn = clamp(-angDiff(p.yaw, want) * 3, -1, 1); gas = p.vx < 30; brake = p.vx > 35; nit = false;
   } else gas = save.autoGas ? !brake : input.gas;
-  if (!go && !p.finished) { gas = false; }
-  const i = p.idx, onRoad = Math.abs(p.d) < ROAD_W / 2 + KERB_W * 0.7;
-  const wet = theme.rain ? 0.88 : 1;
-  let vmax = st.top / 3.6 * (onRoad ? 1 : 0.55);
+  if (!go && !p.finished) { gas = false; brake = true; }
+  const onRoad = Math.abs(p.d) < ROAD_W / 2 + KERB_W * 0.7;
+  const wet = theme.rain ? 0.8 : 1, mu = 1.45 * st.grip * wet * (onRoad ? 1 : 0.55);
   // rebufo
   p.draft = 0;
   for (const r of rivals) { const ds = r.prog - p.prog; if (ds > 5 && ds < 32 && Math.abs(r.d - p.d) < 1.7) p.draft = 1; }
-  if (p.draft) vmax *= 1.04;
   // nitro
   p.boost = false;
-  if (go && nit && p.nitro > 0.05 && gas) {
+  if (go && nit && p.nitro > 0.05 && gas && p.vx > 5) {
     if (!p.wasBoost) { AU.nitro(); vibrate(40); }
-    p.boost = true; p.nitro = Math.max(0, p.nitro - dt); vmax *= 1.16 * st.boost;
+    p.boost = true; p.nitro = Math.max(0, p.nitro - dt);
   }
   p.wasBoost = p.boost;
-  // aceleración longitudinal
-  let a = 0;
-  if (go || p.finished) {
-    if (brake && p.v > 0.5) a -= (brakeDriftPrev(p, steerIn) ? 9 : 26) * wet;
-    else if (gas) a += st.acc * 10.5 * Math.max(0, 1 - Math.pow(p.v / vmax, 2.2)) + (p.boost ? 9 * st.boost : 0) + (p.draft ? 1.5 : 0);
-    else a -= 1.8 + 0.00035 * p.v * p.v;
-    if (p.v > vmax) a -= (p.v - vmax) * (onRoad ? 1.2 : 2.2);
-    if (!onRoad) a -= p.v * 0.35;
-  }
-  p.lonA = lerp(p.lonA, a, 0.2);
-  p.v = Math.max(0, p.v + a * dt);
-  // dirección y agarre: el giro se limita a lo que permite el agarre (ayuda para botones táctiles)
-  const maxLat = 21 * st.grip * wet * (onRoad ? 1 : 0.6);
-  const brakeDrift = brake && Math.abs(steerIn) > 0.3 && p.v > 22;          // freno + giro = derrape controlado
-  const gripSteer = Math.atan(maxLat * (brakeDrift ? 1.45 : 1.12) * WHEELBASE / Math.max(1, p.v * p.v));
-  const maxSteer = Math.min(0.5 / (1 + p.v / 22), gripSteer);
-  p.steer = damp(p.steer, steerIn * maxSteer, 9, dt);
-  let yawRate = -p.v * Math.tan(p.steer) / WHEELBASE;   // dirección positiva = derecha = guiñada negativa
-  const req = Math.abs(yawRate * p.v);
-  const slip = clamp(req / maxLat - 1, 0, 1);
-  if (slip > 0) p.v -= slip * (brakeDrift ? 9 : 5) * dt;
-  const driftTarget = p.v > 18 ? clamp(slip * (brakeDrift ? 1.6 : 1.1), 0, 0.45) * Math.sign(p.steer) : 0;
-  p.drift = damp(p.drift, driftTarget, slip > 0 ? 5 : 3, dt);
-  if (Math.abs(p.drift) > 0.08 && go) { p.nitro = Math.min(st.nitro, p.nitro + dt * 0.4 * Math.abs(p.drift) / 0.3); if (!p.driftMsg) { p.driftMsg = 1; showMsg('¡DERRAPE! +NITRO', '#7fe8ff', 0.9); } } else p.driftMsg = 0;
-  if (p.draft && go) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.18);
-  if (go && !p.boost) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.035);
-  p.yaw += yawRate * dt;
-  p.latA = lerp(p.latA, yawRate * p.v, 0.15);
-  // mover
-  const fx = Math.cos(p.yaw), fz = -Math.sin(p.yaw);
-  p.x += fx * p.v * dt; p.z += fz * p.v * dt;
-  updateProgress(p);
-  // muros
-  const ii = p.idx, wl = T.wall[ii] - 1.05;
-  p.crashCD -= dt;
-  if (Math.abs(p.d) > wl) {
-    const sd = Math.sign(p.d), over = Math.abs(p.d) - wl, rx = -T.tz[ii], rz = T.tx[ii];
-    p.x -= rx * over * sd; p.z -= rz * over * sd; p.d = sd * wl;
-    const vLat = p.v * (fx * rx + fz * rz) * sd;
-    if (vLat > 0) {
-      const th = headingOf(T.tx[ii], T.tz[ii]);
-      p.yaw = p.yaw + angDiff(p.yaw, th) * 0.6;
-      p.v *= 1 - Math.min(0.5, vLat * 0.045);
-      if (vLat > 5 && p.crashCD <= 0) { AU.crash(); vibrate(160); shake = Math.min(1, vLat / 15); p.crashCD = 0.5; sparks(p, sd); }
-      else if (p.crashCD <= 0) { AU.bump(); p.crashCD = 0.25; }
+  const vtop = st.top / 3.6, P = 440e3 * st.acc * (p.boost ? 1.45 * st.boost : 1);
+  const CdA = 2 * 440e3 * st.acc / (PHY.rho * vtop * vtop * vtop) * (p.draft ? 0.82 : 1);
+  // dirección con límite según velocidad y suavizado (el volante no gira de golpe)
+  const dMax = 0.55 / (1 + Math.max(0, p.vx) / 17);
+  const target = steerIn * dMax, rate = 2.6;
+  p.steer += clamp(target - p.steer, -rate * dt, rate * dt);
+  const n = 4, h = dt / n;
+  let slipMax = 0, crashV = 0;
+  for (let it = 0; it < n; it++) {
+    const vx = p.vx, vy = p.vy, r = p.r, spd = Math.hypot(vx, vy);
+    const down = 0.5 * PHY.rho * PHY.ClA * vx * vx, L = PHY.a + PHY.b;
+    let Fzf = PHY.m * PHY.g * PHY.b / L + down * 0.45 - PHY.m * (p.ax || 0) * PHY.h / L;
+    let Fzr = PHY.m * PHY.g * PHY.a / L + down * 0.55 + PHY.m * (p.ax || 0) * PHY.h / L;
+    Fzf = Math.max(500, Fzf); Fzr = Math.max(500, Fzr);
+    // fuerzas longitudinales
+    let Fx = 0, Fxr = 0, Fxf = 0;
+    if (go || p.finished) {
+      if (brake && vx > 0.5) { const Fb = mu * (Fzf + Fzr) * 0.92; Fxf = -Fb * 0.62; Fxr = -Fb * 0.38; }
+      else if (brake && vx <= 0.5 && go) { Fxr = -PHY.m * 4; }                   // marcha atrás
+      else if (gas) { const Fd = Math.min(P / Math.max(vx, 6), PHY.m * 8.5 * st.acc * (p.boost ? 1.3 : 1)); Fxf = Fd * 0.35; Fxr = Fd * 0.65; }
+      else Fxr = -Math.sign(vx) * 700;                                           // freno motor
+    } else if (Math.abs(vx) > 0.1) Fxr = -Math.sign(vx) * PHY.m * 6;
+    // fuerzas laterales primero (ABS y control de tracción dan prioridad al giro)
+    let Fyf = 0, Fyr = 0;
+    const lowV = Math.abs(vx) <= 1.5;
+    if (!lowV) {
+      const af = p.steer - Math.atan2(vy + PHY.a * r, Math.abs(vx)), ar = -Math.atan2(vy - PHY.b * r, Math.abs(vx));
+      Fyf = clamp(tireF(af, Fzf, mu), -mu * Fzf, mu * Fzf); Fyr = clamp(tireF(ar, Fzr, mu * 1.1), -mu * 1.1 * Fzr, mu * 1.1 * Fzr);
+    }
+    const remF = Math.max(0.45 * mu * Fzf, Math.sqrt(Math.max(0, (mu * Fzf) ** 2 - Fyf * Fyf)));
+    const remR = Math.max(0.45 * mu * Fzr, Math.sqrt(Math.max(0, (mu * 1.1 * Fzr) ** 2 - Fyr * Fyr)));
+    Fxf = clamp(Fxf, -remF, remF); Fxr = clamp(Fxr, -remR, remR);
+    Fx = Fxf + Fxr - Math.sign(vx) * (0.5 * PHY.rho * CdA * vx * vx + 160 + (onRoad ? 0 : 0.22 * PHY.m * PHY.g * Math.min(1, Math.abs(vx) / 5)));
+    if (!lowV) {
+      const ax = (Fx - Fyf * Math.sin(p.steer)) / PHY.m + vy * r;
+      const ay = (Fyr + Fyf * Math.cos(p.steer)) / PHY.m - vx * r;
+      let dr = (PHY.a * Fyf * Math.cos(p.steer) - PHY.b * Fyr) / PHY.Iz;
+      // control de estabilidad suave: deja derrapar pero evita trompos
+      const beta = Math.atan2(vy, Math.max(1, vx)), bLim = 0.13;
+      if (beta * r < 0 && Math.abs(beta) > bLim) dr -= Math.sign(r) * 30 * (Math.abs(beta) - bLim);
+      dr -= r * 0.6;   // amortiguación de guiñada (estabilidad)
+      p.vx += ax * h; p.vy += ay * h; p.r += dr * h; p.ax = lerp(p.ax || 0, ax, 0.1);
+      if (Math.abs(p.vy) > 0.45 * Math.abs(p.vx) && Math.abs(p.vx) > 5) p.vy = Math.sign(p.vy) * 0.45 * Math.abs(p.vx);
+      p.latA = ay + vx * r;
+    } else { // muy despacio: giro cinemático
+      p.r = p.vx * Math.tan(p.steer) / L; p.vy *= 0.8; p.vx += Fx / PHY.m * h; p.ax = Fx / PHY.m; p.latA = 0;
+    }
+    if (!(go || p.finished) && Math.abs(p.vx) < 0.3) { p.vx = 0; p.vy = 0; p.r = 0; }
+    if (p.vx < -9) p.vx = -9;
+    // integrar posición (guiñada positiva = izquierda; r positiva = derecha)
+    p.yaw -= p.r * h;
+    const fx = Math.cos(p.yaw), fz = -Math.sin(p.yaw), rx = Math.sin(p.yaw), rz = Math.cos(p.yaw);
+    p.x += (fx * p.vx + rx * p.vy) * h; p.z += (fz * p.vx + rz * p.vy) * h;
+    updateProgress(p);
+    // muros
+    const ii = p.idx, wl = T.wall[ii] - 1.05;
+    if (Math.abs(p.d) > wl) {
+      const sd = Math.sign(p.d), over = Math.abs(p.d) - wl, nx = -T.tz[ii] * sd, nz = T.tx[ii] * sd;
+      p.x -= nx * over; p.z -= nz * over; p.d = sd * wl;
+      let Vx = fx * p.vx + rx * p.vy, Vz = fz * p.vx + rz * p.vy;
+      const vn = Vx * nx + Vz * nz;
+      if (vn > 0) {
+        Vx -= 1.25 * vn * nx; Vz -= 1.25 * vn * nz;
+        const tf = 1 - Math.min(0.35, vn * 0.025); Vx *= tf; Vz *= tf;
+        p.vx = Vx * fx + Vz * fz; p.vy = Vx * rx + Vz * rz;
+        if (vn > 3) { p.r *= 0.5; const th = headingOf(T.tx[ii], T.tz[ii]); p.yaw += angDiff(p.yaw, th) * Math.min(0.5, vn * 0.03); }
+        crashV = Math.max(crashV, vn); p.wallSide = sd;
+      }
     }
   }
+  p.v = Math.hypot(p.vx, p.vy);
+  p.crashCD -= dt;
+  if (crashV > 0) {
+    if (crashV > 6 && p.crashCD <= 0) { AU.crash(); vibrate(160); shake = Math.min(1, crashV / 15); p.crashCD = 0.5; sparks(p, p.wallSide); }
+    else if (p.crashCD <= 0) { AU.bump(); p.crashCD = 0.25; }
+  }
+  // derrape: ángulo entre hacia dónde apunta el coche y hacia dónde va
+  const beta = Math.atan2(p.vy, Math.max(1, p.vx));
+  p.drift = p.vx > 15 ? beta : 0;
+  p.slip = clamp((slipMax - 0.1) * 6, 0, 1);
+  if (Math.abs(beta) > 0.09 && p.vx > 18 && go) { p.nitro = Math.min(st.nitro, p.nitro + dt * 0.5 * Math.min(1, Math.abs(beta) / 0.25)); if (!p.driftMsg) { p.driftMsg = 1; showMsg('¡DERRAPE! +NITRO', '#7fe8ff', 0.9); } } else p.driftMsg = 0;
+  if (p.draft && go) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.18);
+  if (go && !p.boost) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.035);
+  p.lonA = p.ax || 0;
   // contacto con rivales
   for (const r of rivals) {
     const ds = r.prog - p.prog, dd = r.d - p.d;
@@ -82109,26 +82156,24 @@ function updatePlayer(dt) {
       const ox = 4.5 - Math.abs(ds), oy = 1.95 - Math.abs(dd), rx = -T.tz[p.idx], rz = T.tx[p.idx];
       if (oy < ox * 0.7) {
         const sd = Math.sign(dd) || 1; p.x -= rx * sd * oy * 0.6; p.z -= rz * sd * oy * 0.6; r.d += sd * oy * 0.4;
-        p.v *= 0.985; r.v *= 0.985;
+        p.vy -= sd * 1.2; p.vx *= 0.99; r.v *= 0.985;
         if (p.crashCD <= 0) { AU.bump(); vibrate(40); p.crashCD = 0.3; shake = 0.3; }
-      } else if (ds > 0 && p.v > r.v) {
-        const rel = p.v - r.v; p.v = r.v * 0.97; r.v += rel * 0.3; p.x -= T.tx[p.idx] * ox; p.z -= T.tz[p.idx] * ox;
+      } else if (ds > 0 && p.vx > r.v) {
+        const rel = p.vx - r.v; p.vx = r.v * 0.97; r.v += rel * 0.3; p.x -= T.tx[p.idx] * ox; p.z -= T.tz[p.idx] * ox;
         if (p.crashCD <= 0) { AU.bump(); vibrate(60); p.crashCD = 0.3; shake = Math.min(1, rel / 10); }
-      } else if (ds < 0 && r.v > p.v) { r.v = p.v * 0.97; r.prog -= ox; }
+      } else if (ds < 0 && r.v > p.vx) { r.v = Math.max(0, p.vx) * 0.97; r.prog -= ox; }
     }
   }
   // atasco o dirección contraria: recolocar
   const rel = Math.abs(angDiff(headingOf(T.tx[p.idx], T.tz[p.idx]), p.yaw));
   p.wrong = rel > 1.9 && p.v > 4 ? p.wrong + dt : 0;
   p.stuck = go && (p.v < 3 && (Math.abs(p.d) > ROAD_W / 2 || rel > 1.2)) ? p.stuck + dt : 0;
-  if (p.stuck > 2.5 || p.wrong > 3) respawn(p);
-  // altura y orientación
+  if (p.stuck > 3 || p.wrong > 3) respawn(p);
   const a0 = p.idx, a1 = (a0 + 1) % T.N;
   p.y = T.py[a0] + (T.py[a1] - T.py[a0]) * clamp((p.sLast - a0 * DS) / DS, 0, 1);
   p.pitch = Math.atan((T.py[a1] - T.py[mod(a0 - 1, T.N)]) / (2 * DS));
   p.rough = !onRoad ? 1 : (Math.abs(p.d) > ROAD_W / 2 - 0.3 ? 0.4 : 0);
   if (!onRoad && p.v > 8) shake = Math.max(shake, 0.12);
-  p.slip = slip;
   // vueltas
   if (!p.finished && p.prog >= p.lap * T.L) {
     const lt = raceT - p.lapStart; p.lapTimes.push(lt); p.lapStart = raceT; p.lap++;
@@ -82138,10 +82183,9 @@ function updatePlayer(dt) {
   }
   if (mode === 'trial' && ghostRec && go) recordGhost();
 }
-function brakeDriftPrev(p, st) { return Math.abs(st) > 0.3 && p.v > 22; }
 function respawn(p) {
   const s = sampleAt(p.prog + S0());
-  p.x = s.x; p.z = s.z; p.yaw = headingOf(s.tx, s.tz); p.v = 0; p.stuck = 0; p.wrong = 0; p.drift = 0; p.d = 0;
+  p.x = s.x; p.z = s.z; p.yaw = headingOf(s.tx, s.tz); p.v = p.vx = p.vy = p.r = 0; p.steer = 0; p.stuck = 0; p.wrong = 0; p.drift = 0; p.d = 0;
   showMsg('RECOLOCADO', '#ffffff', 1.2);
 }
 
@@ -82152,11 +82196,12 @@ function updateRivals(dt) {
     const s = r.prog + S0(), idx = Math.floor(mod(s, T.L) / DS);
     // velocidad objetivo según las curvas que vienen
     let vt = r.top;
-    for (let j = 2; j < 90; j += 2) {
-      const k = Math.abs(T.k[(idx + j) % T.N]) + 1e-5, vc = Math.sqrt(r.grip / k);
-      vt = Math.min(vt, Math.sqrt(vc * vc + 2 * 17 * j * DS));
+    const cAero = 0.5 * PHY.rho * PHY.ClA / PHY.m, vcAt = k => { const den = k - r.grip * cAero; return den <= 1e-6 ? 999 : Math.sqrt(r.grip * PHY.g / den); };
+    for (let j = 2; j < 120; j += 2) {
+      const vc = vcAt(Math.abs(T.k[(idx + j) % T.N]) + 1e-5);
+      vt = Math.min(vt, Math.sqrt(vc * vc + 2 * r.grip * PHY.g * 0.85 * j * DS));
     }
-    const kNow = Math.abs(T.k[idx]) + 1e-5; vt = Math.min(vt, Math.sqrt(r.grip / kNow) * 1.02);
+    vt = Math.min(vt, vcAt(Math.abs(T.k[idx]) + 1e-5) * 1.01);
     if (!player.finished) { const gap = r.prog - player.prog; if (gap > 60) vt *= 0.965; else if (gap < -90) vt *= 1.035; }
     if (!go) vt = 0;
     // evitar a los coches de delante
@@ -82169,9 +82214,9 @@ function updateRivals(dt) {
       td = Math.abs(left - r.d) < Math.abs(right - r.d) ? (left > -lim ? left : right) : (right < lim ? right : left);
       if (blocker.ds < 8) vt = Math.min(vt, o.v - 0.5);
     }
-    r.td = clamp(td, -ROAD_W / 2 + 1.3, ROAD_W / 2 - 1.3);
-    r.d += clamp(r.td - r.d, -3.2 * dt, 3.2 * dt);
-    const acc = r.v < vt ? 8.5 * (1 - r.v / (r.top * 1.05)) + 1 : -20;
+    r.td = go ? clamp(td, -ROAD_W / 2 + 1.3, ROAD_W / 2 - 1.3) : r.d;
+    if (go) r.d += clamp(r.td - r.d, -3.2 * dt, 3.2 * dt);
+    const acc = r.v < vt ? 8 * (1 - r.v / (r.top * 1.05)) + 0.8 : -r.grip * PHY.g * 0.9;
     r.v = Math.max(0, Math.min(r.v + acc * dt, Math.max(vt, r.v - 20 * dt)));
     if (go) r.prog += r.v * dt;
     if (!r.finished && r.prog >= track.laps * T.L) { r.finished = true; r.time = raceT; }
@@ -82191,8 +82236,8 @@ function poseCar(r, dt) {
   c.rotation.set(0, r.yaw, r.pitch || 0);
   u.body.rotation.x = damp(u.body.rotation.x, clamp(-(r.latA || 0) * 0.0045, -0.06, 0.06), 6, dt);
   u.body.rotation.z = damp(u.body.rotation.z, clamp(-(r.lonA || 0) * 0.0018, -0.035, 0.035), 6, dt);
-  u.body.rotation.y = r.drift ? -r.drift * 0.6 : 0;
-  for (const w of u.wheels) { w.spin.rotation.z -= r.v * dt / 0.37; if (w.front) w.pivot.rotation.y = r.isPlayer ? -r.steer * 1.4 : clamp(-(r.td - r.d) * 0.08, -0.3, 0.3); }
+  u.body.rotation.y = 0;
+  for (const w of u.wheels) { w.spin.rotation.z -= (r.isPlayer ? r.vx : r.v) * dt / 0.37; if (w.front) w.pivot.rotation.y = r.isPlayer ? -r.steer * 2.2 : clamp(-(r.td - r.d) * 0.08, -0.3, 0.3); }
   setBrake(c, r.isPlayer ? (input.brake && r.v > 1) : r.brk, theme.night);
 }
 
@@ -82207,7 +82252,7 @@ function updateCamera(dt, r, cine) {
     camera.position.copy(camPos); camera.lookAt(r.x, r.y + 0.8, r.z);
     camera.fov = 50; camera.updateProjectionMatrix(); return;
   }
-  camYaw = camInit ? camYaw + angDiff(camYaw, r.yaw - (r.drift || 0) * 0.35) * (1 - Math.exp(-dt * 7)) : r.yaw;
+  camYaw = camInit ? camYaw + angDiff(camYaw, r.yaw - (r.drift || 0) * 0.55) * (1 - Math.exp(-dt * 7)) : r.yaw;
   const cfx = Math.cos(camYaw), cfz = -Math.sin(camYaw), v = r.v;
   const modeC = save.cam;
   let back = 5.8 + v * 0.012, up = 1.95 + v * 0.004, ahead = 7;
@@ -82436,6 +82481,7 @@ function precomputeMaps() { // formas de todos los circuitos para las tarjetas
   for (let i = 0; i < TRACKS.length; i++) {
     const t = TRACKS[i]; let pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
     const c = new THREE.CatmullRomCurve3(pts, true, 'centripetal'), sp = c.getSpacedPoints(300);
+    t.len = c.getLength();
     let minX = 1e9, minZ = 1e9, maxX = -1e9, maxZ = -1e9;
     for (const p of sp) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
     const sz = Math.max(maxX - minX, maxZ - minZ);
@@ -82592,7 +82638,7 @@ function startDemo() {
   buildTracks(ti); clearCars();
   player = { finished: true, prog: -1e9, d: 0, v: 0, isPlayer: false };
   const field = makeField().slice(0, 5); field[0].m = save.car; field[0].color = PAINT[save.colors[save.car] ?? CARS[save.car].paint];
-  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false); r.top = (300 + k * 4) / 3.6; r.grip = 20; r.lane = (k % 3 - 1) * 1.6; rivals.push(r); racers.push(r); });
+  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false); r.top = (300 + k * 4) / 3.6; r.grip = 1.3; r.lane = (k % 3 - 1) * 1.6; rivals.push(r); racers.push(r); });
   raceT = 5; demo = { ti }; camInit = false;
 }
 function updateDemo(dt) {

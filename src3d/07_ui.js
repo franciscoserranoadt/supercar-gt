@@ -74,6 +74,7 @@ function precomputeMaps() { // formas de todos los circuitos para las tarjetas
   for (let i = 0; i < TRACKS.length; i++) {
     const t = TRACKS[i]; let pts = t.shape.map(p => new THREE.Vector3(p[0], 0, p[1]));
     const c = new THREE.CatmullRomCurve3(pts, true, 'centripetal'), sp = c.getSpacedPoints(300);
+    t.len = c.getLength();
     let minX = 1e9, minZ = 1e9, maxX = -1e9, maxZ = -1e9;
     for (const p of sp) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
     const sz = Math.max(maxX - minX, maxZ - minZ);

@@ -25,7 +25,7 @@ const Store = {
 };
 const DEFAULTS = {
   credits: 0, owned: [0], car: 0, colors: {}, up: {}, unlocked: 1, best: {}, bestLap: {}, podiums: {}, ghosts: {},
-  music: true, sfx: true, vib: true, autoGas: true, tilt: false, diff: 1, q: 2, cam: 0, lastTrack: 0, champ: null, trophies: 0
+  music: true, sfx: true, guide: true, vib: true, autoGas: true, tilt: false, diff: 1, q: 2, cam: 0, lastTrack: 0, champ: null, trophies: 0
 };
 const save = Object.assign({}, DEFAULTS, Store.get('supercargp3d', {}));
 function persist() { Store.set('supercargp3d', save); }

@@ -80933,7 +80933,7 @@ const Store = {
 };
 const DEFAULTS = {
   credits: 0, owned: [0], car: 0, colors: {}, up: {}, unlocked: 1, best: {}, bestLap: {}, podiums: {}, ghosts: {},
-  music: true, sfx: true, vib: true, autoGas: true, tilt: false, diff: 1, q: 2, cam: 0, lastTrack: 0, champ: null, trophies: 0
+  music: true, sfx: true, guide: true, vib: true, autoGas: true, tilt: false, diff: 1, q: 2, cam: 0, lastTrack: 0, champ: null, trophies: 0
 };
 const save = Object.assign({}, DEFAULTS, Store.get('supercargp3d', {}));
 function persist() { Store.set('supercargp3d', save); }
@@ -81442,6 +81442,11 @@ function computeTrack(ti) {
     for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += h * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
   }
   Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k });
+  // trazada ideal: hacia el interior de la curva que viene, suavizada
+  const line0 = new Float32Array(N), line = new Float32Array(N);
+  for (let i = 0; i < N; i++) { let ka = 0; for (let j = 4; j <= 32; j += 4) ka += k[(i + j) % N]; line0[i] = clamp(ka / 8 * 650, -ROAD_W / 2 + 1.6, ROAD_W / 2 - 1.6); }
+  for (let i = 0; i < N; i++) { let sm = 0; for (let m = -12; m <= 12; m++) sm += line0[mod(i + m, N)]; line[i] = sm / 25; }
+  T.line = line;
   const cell = 30, grid = new Map();
   for (let i = 0; i < N; i++) { const key = Math.floor(px[i] / cell) + ',' + Math.floor(pz[i] / cell); if (!grid.has(key)) grid.set(key, []); grid.get(key).push(i); }
   T.grid = grid; T.cell = cell;
@@ -81977,7 +81982,7 @@ function sampleAt(s) {   // posición interpolada en la pista para una distancia
 const S0 = () => START_I * DS;
 function headingOf(tx, tz) { return Math.atan2(-tz, tx); }
 
-function clearCars() { for (const r of racers) if (r.car) scene.remove(r.car); if (ghost && ghost.car) scene.remove(ghost.car); racers = []; rivals = []; ghost = null; }
+function clearCars() { if (guide) { scene.remove(guide.m); guide.m.geometry.dispose(); guide = null; } for (const r of racers) if (r.car) scene.remove(r.car); if (ghost && ghost.car) scene.remove(ghost.car); racers = []; rivals = []; ghost = null; }
 function makeRacer(m, color, name, slot, isPlayer, stats) {
   const car = buildCar(m, color); scene.add(car);
   const row = Math.floor(slot / 2), prog = -(6 + row * 5 + (slot % 2) * 2) * DS;
@@ -82007,6 +82012,7 @@ function startRace(ti, md) {
       rivals.push(r); racers.push(r);
     });
   } else setupGhost(ti);
+  makeGuide();
   raceT = -4.2; results = null; msg = null; paused = false; lastCount = 5; camInit = false;
   setState('race');
   AU.playSong(1); AU.engineOn();
@@ -82227,6 +82233,51 @@ function updateRivals(dt) {
     r.brk = acc < 0 && r.v > 10;
     r.latA = r.v * r.v * T.k[p.i];
   }
+}
+
+/* ---------- guía de trazada: verde (bien), amarillo (afloja), rojo (frena) ---------- */
+let guide = null;
+const G_COL = [new THREE.Color('#2bff6a'), new THREE.Color('#ffd21a'), new THREE.Color('#ff2a2a')], _gc = new THREE.Color();
+function makeGuide() {
+  const n = 90, pos = new Float32Array(n * 12), col = new Float32Array(n * 12), idx = [];
+  for (let k = 0; k < n; k++) { const a = k * 4; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8, toneMapped: false }));
+  m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+  guide = { m, n };
+}
+function lineAt(s) { const u = mod(s, T.L) / DS, i = Math.floor(u) % T.N, f = u - Math.floor(u); return lerp(T.line[i], T.line[(i + 1) % T.N], f); }
+function updateGuide() {
+  if (!guide) return;
+  const p = player, on = save.guide && !p.finished && state === 'race';
+  guide.m.visible = on; if (!on) return;
+  const st = p.stats, wet = theme.rain ? 0.8 : 1, mu = 1.45 * st.grip * wet * 0.9, c = 0.5 * PHY.rho * PHY.ClA / PHY.m, g0 = PHY.g;
+  const v = Math.max(0, p.vx), decMax = mu * (g0 + c * v * v) * 0.85;
+  const s0 = p.prog + S0(), range = 60 + v * 3.4, step = 4, n = Math.min(guide.n, Math.floor(range / step));
+  const pos = guide.m.geometry.attributes.position.array, col = guide.m.geometry.attributes.color.array;
+  const vcAt = kk => { const den = kk - mu * c; return den <= 1e-6 ? 999 : Math.sqrt(mu * g0 / den); };
+  const ratio = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    const sa = s0 + 6 + k * step;
+    let kk = 0; for (let q = 0; q < 3; q++) kk = Math.max(kk, Math.abs(T.k[Math.floor(mod(sa + q * 2, T.L) / DS) % T.N]));
+    const vc = vcAt(kk + 1e-5), dist = Math.max(1, sa - s0);
+    ratio[k] = v > vc ? (v * v - vc * vc) / (2 * dist) / decMax : 0;
+  }
+  // cada tramo avisa de la curva más exigente que tiene por delante
+  for (let k = n - 2; k >= 0; k--) ratio[k] = Math.max(ratio[k], ratio[k + 1]);
+  for (let k = 0; k < n; k++) {
+    const sa = s0 + 6 + k * step, sb = sa + step * 0.62, t = ratio[k];
+    if (t < 0.35) _gc.copy(G_COL[0]); else if (t < 0.7) _gc.copy(G_COL[0]).lerp(G_COL[1], clamp((t - 0.35) / 0.15, 0, 1)); else _gc.copy(G_COL[1]).lerp(G_COL[2], clamp((t - 0.7) / 0.15, 0, 1));
+    for (const [sx, o] of [[sa, 0], [sb, 6]]) {
+      const P = sampleAt(sx), d = lineAt(sx), rx = -P.tz, rz = P.tx, w = 0.75;
+      pos.set([P.x + rx * (d - w), P.y + 0.06, P.z + rz * (d - w), P.x + rx * (d + w), P.y + 0.06, P.z + rz * (d + w)], k * 12 + o);
+      col.set([_gc.r, _gc.g, _gc.b, _gc.r, _gc.g, _gc.b], k * 12 + o);
+    }
+  }
+  guide.m.geometry.setDrawRange(0, n * 6);
+  guide.m.geometry.attributes.position.needsUpdate = true; guide.m.geometry.attributes.color.needsUpdate = true;
 }
 
 /* ---------- colocar los coches en la escena ---------- */
@@ -82792,14 +82843,15 @@ function drawSettings() {
     ['music', 'Música: ' + (save.music ? 'Sí' : 'No')], ['sfx', 'Efectos y motor: ' + (save.sfx ? 'Sí' : 'No')],
     ['autoGas', 'Acelerador: ' + (save.autoGas ? 'Automático' : 'Botón GAS')], ['tilt', 'Dirección: ' + (save.tilt ? 'Inclinar el móvil' : 'Botones')],
     ['diff', 'Dificultad: ' + ['Fácil', 'Normal', 'Difícil'][save.diff]], ['cam', 'Cámara: ' + ['Detrás', 'Lejos', 'Capó'][save.cam]],
-    ['q', 'Gráficos: ' + ['Bajos', 'Medios', 'Altos'][save.q]], ['vib', 'Vibración: ' + (save.vib ? 'Sí' : 'No')]
+    ['q', 'Gráficos: ' + ['Bajos', 'Medios', 'Altos'][save.q]], ['vib', 'Vibración: ' + (save.vib ? 'Sí' : 'No')],
+    ['guide', 'Guía de trazada: ' + (save.guide ? 'Sí' : 'No')]
   ];
-  const bw = Math.min(W * 0.4, H * 0.9), bh = H * 0.085, gap = H * 0.022;
+  const bw = Math.min(W * 0.4, H * 0.9), bh = H * 0.08, gap = H * 0.02;
   rows.forEach(([k, l], i) => {
-    const col = i % 2, row = Math.floor(i / 2), x = W / 2 + (col ? gap / 2 : -bw - gap / 2), y = H * 0.2 + row * (bh + gap);
+    const col = i % 2, row = Math.floor(i / 2), x = rows.length % 2 && i === rows.length - 1 ? W / 2 - bw / 2 : W / 2 + (col ? gap / 2 : -bw - gap / 2), y = H * 0.18 + row * (bh + gap);
     uiButton('toggle:' + k, x, y, bw, bh, l, { c1: '#3b4a63', c2: '#1b2333', fs: 0.36 });
   });
-  text('Consejo: derrapa en las curvas y ponte detrás de un rival (rebufo) para recargar el nitro.', W / 2, H * 0.84, H * 0.03, '#cfd8e3', 'center', 600);
+  text('Guía: verde = bien · amarillo = afloja · rojo = frena. Derrapa o ve a rebufo para recargar el nitro.', W / 2, H * 0.87, H * 0.03, '#cfd8e3', 'center', 600);
   uiButton('back', H * 0.05, H * 0.035, H * 0.3, H * 0.1, '◀ VOLVER', Object.assign({ fs: 0.36 }, GREY));
 }
 function drawPause() {
@@ -82809,7 +82861,8 @@ function drawPause() {
   const bw = H * 0.62, bh = H * 0.11;
   uiButton('resume', W / 2 - bw / 2, H * 0.3, bw, bh, '▶ CONTINUAR', { c1: '#2fbf5b', c2: '#167a35' });
   uiButton('restart', W / 2 - bw / 2, H * 0.44, bw, bh, '↻ REPETIR CARRERA', GREY);
-  uiButton('toggle:cam', W / 2 - bw / 2, H * 0.58, bw, bh, 'CÁMARA: ' + ['DETRÁS', 'LEJOS', 'CAPÓ'][save.cam], GREY);
+  uiButton('toggle:cam', W / 2 - bw / 2, H * 0.58, bw * 0.49, bh, 'CÁMARA: ' + ['DETRÁS', 'LEJOS', 'CAPÓ'][save.cam], Object.assign({ fs: 0.3 }, GREY));
+  uiButton('toggle:guide', W / 2 + bw * 0.01, H * 0.58, bw * 0.49, bh, 'GUÍA: ' + (save.guide ? 'SÍ' : 'NO'), Object.assign({ fs: 0.3 }, save.guide ? { c1: '#2fbf5b', c2: '#167a35' } : GREY));
   uiButton('quit', W / 2 - bw / 2, H * 0.72, bw, bh, 'SALIR AL MENÚ', GREY);
 }
 function drawResults() {
@@ -82977,6 +83030,7 @@ function frame(now) {
       if (!paused) { const n = dt > 0.025 ? 2 : 1; for (let i = 0; i < n; i++) updateRace(dt / n); }
       for (const r of racers) poseCar(r, dt);
       updateCamera(dt, player, false);
+      updateGuide();
       updateWorldFx(dt, player.car.position);
       updateFx(paused ? 0 : dt);
       renderer.render(scene, camera);

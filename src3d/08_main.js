@@ -169,14 +169,15 @@ function drawSettings() {
     ['music', 'Música: ' + (save.music ? 'Sí' : 'No')], ['sfx', 'Efectos y motor: ' + (save.sfx ? 'Sí' : 'No')],
     ['autoGas', 'Acelerador: ' + (save.autoGas ? 'Automático' : 'Botón GAS')], ['tilt', 'Dirección: ' + (save.tilt ? 'Inclinar el móvil' : 'Botones')],
     ['diff', 'Dificultad: ' + ['Fácil', 'Normal', 'Difícil'][save.diff]], ['cam', 'Cámara: ' + ['Detrás', 'Lejos', 'Capó'][save.cam]],
-    ['q', 'Gráficos: ' + ['Bajos', 'Medios', 'Altos'][save.q]], ['vib', 'Vibración: ' + (save.vib ? 'Sí' : 'No')]
+    ['q', 'Gráficos: ' + ['Bajos', 'Medios', 'Altos'][save.q]], ['vib', 'Vibración: ' + (save.vib ? 'Sí' : 'No')],
+    ['guide', 'Guía de trazada: ' + (save.guide ? 'Sí' : 'No')]
   ];
-  const bw = Math.min(W * 0.4, H * 0.9), bh = H * 0.085, gap = H * 0.022;
+  const bw = Math.min(W * 0.4, H * 0.9), bh = H * 0.08, gap = H * 0.02;
   rows.forEach(([k, l], i) => {
-    const col = i % 2, row = Math.floor(i / 2), x = W / 2 + (col ? gap / 2 : -bw - gap / 2), y = H * 0.2 + row * (bh + gap);
+    const col = i % 2, row = Math.floor(i / 2), x = rows.length % 2 && i === rows.length - 1 ? W / 2 - bw / 2 : W / 2 + (col ? gap / 2 : -bw - gap / 2), y = H * 0.18 + row * (bh + gap);
     uiButton('toggle:' + k, x, y, bw, bh, l, { c1: '#3b4a63', c2: '#1b2333', fs: 0.36 });
   });
-  text('Consejo: derrapa en las curvas y ponte detrás de un rival (rebufo) para recargar el nitro.', W / 2, H * 0.84, H * 0.03, '#cfd8e3', 'center', 600);
+  text('Guía: verde = bien · amarillo = afloja · rojo = frena. Derrapa o ve a rebufo para recargar el nitro.', W / 2, H * 0.87, H * 0.03, '#cfd8e3', 'center', 600);
   uiButton('back', H * 0.05, H * 0.035, H * 0.3, H * 0.1, '◀ VOLVER', Object.assign({ fs: 0.36 }, GREY));
 }
 function drawPause() {
@@ -186,7 +187,8 @@ function drawPause() {
   const bw = H * 0.62, bh = H * 0.11;
   uiButton('resume', W / 2 - bw / 2, H * 0.3, bw, bh, '▶ CONTINUAR', { c1: '#2fbf5b', c2: '#167a35' });
   uiButton('restart', W / 2 - bw / 2, H * 0.44, bw, bh, '↻ REPETIR CARRERA', GREY);
-  uiButton('toggle:cam', W / 2 - bw / 2, H * 0.58, bw, bh, 'CÁMARA: ' + ['DETRÁS', 'LEJOS', 'CAPÓ'][save.cam], GREY);
+  uiButton('toggle:cam', W / 2 - bw / 2, H * 0.58, bw * 0.49, bh, 'CÁMARA: ' + ['DETRÁS', 'LEJOS', 'CAPÓ'][save.cam], Object.assign({ fs: 0.3 }, GREY));
+  uiButton('toggle:guide', W / 2 + bw * 0.01, H * 0.58, bw * 0.49, bh, 'GUÍA: ' + (save.guide ? 'SÍ' : 'NO'), Object.assign({ fs: 0.3 }, save.guide ? { c1: '#2fbf5b', c2: '#167a35' } : GREY));
   uiButton('quit', W / 2 - bw / 2, H * 0.72, bw, bh, 'SALIR AL MENÚ', GREY);
 }
 function drawResults() {
@@ -354,6 +356,7 @@ function frame(now) {
       if (!paused) { const n = dt > 0.025 ? 2 : 1; for (let i = 0; i < n; i++) updateRace(dt / n); }
       for (const r of racers) poseCar(r, dt);
       updateCamera(dt, player, false);
+      updateGuide();
       updateWorldFx(dt, player.car.position);
       updateFx(paused ? 0 : dt);
       renderer.render(scene, camera);

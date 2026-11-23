@@ -12,7 +12,7 @@ function sampleAt(s) {   // posición interpolada en la pista para una distancia
 const S0 = () => START_I * DS;
 function headingOf(tx, tz) { return Math.atan2(-tz, tx); }
 
-function clearCars() { for (const r of racers) if (r.car) scene.remove(r.car); if (ghost && ghost.car) scene.remove(ghost.car); racers = []; rivals = []; ghost = null; }
+function clearCars() { if (guide) { scene.remove(guide.m); guide.m.geometry.dispose(); guide = null; } for (const r of racers) if (r.car) scene.remove(r.car); if (ghost && ghost.car) scene.remove(ghost.car); racers = []; rivals = []; ghost = null; }
 function makeRacer(m, color, name, slot, isPlayer, stats) {
   const car = buildCar(m, color); scene.add(car);
   const row = Math.floor(slot / 2), prog = -(6 + row * 5 + (slot % 2) * 2) * DS;
@@ -42,6 +42,7 @@ function startRace(ti, md) {
       rivals.push(r); racers.push(r);
     });
   } else setupGhost(ti);
+  makeGuide();
   raceT = -4.2; results = null; msg = null; paused = false; lastCount = 5; camInit = false;
   setState('race');
   AU.playSong(1); AU.engineOn();
@@ -262,6 +263,51 @@ function updateRivals(dt) {
     r.brk = acc < 0 && r.v > 10;
     r.latA = r.v * r.v * T.k[p.i];
   }
+}
+
+/* ---------- guía de trazada: verde (bien), amarillo (afloja), rojo (frena) ---------- */
+let guide = null;
+const G_COL = [new THREE.Color('#2bff6a'), new THREE.Color('#ffd21a'), new THREE.Color('#ff2a2a')], _gc = new THREE.Color();
+function makeGuide() {
+  const n = 90, pos = new Float32Array(n * 12), col = new Float32Array(n * 12), idx = [];
+  for (let k = 0; k < n; k++) { const a = k * 4; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8, toneMapped: false }));
+  m.frustumCulled = false; m.renderOrder = 2; scene.add(m);
+  guide = { m, n };
+}
+function lineAt(s) { const u = mod(s, T.L) / DS, i = Math.floor(u) % T.N, f = u - Math.floor(u); return lerp(T.line[i], T.line[(i + 1) % T.N], f); }
+function updateGuide() {
+  if (!guide) return;
+  const p = player, on = save.guide && !p.finished && state === 'race';
+  guide.m.visible = on; if (!on) return;
+  const st = p.stats, wet = theme.rain ? 0.8 : 1, mu = 1.45 * st.grip * wet * 0.9, c = 0.5 * PHY.rho * PHY.ClA / PHY.m, g0 = PHY.g;
+  const v = Math.max(0, p.vx), decMax = mu * (g0 + c * v * v) * 0.85;
+  const s0 = p.prog + S0(), range = 60 + v * 3.4, step = 4, n = Math.min(guide.n, Math.floor(range / step));
+  const pos = guide.m.geometry.attributes.position.array, col = guide.m.geometry.attributes.color.array;
+  const vcAt = kk => { const den = kk - mu * c; return den <= 1e-6 ? 999 : Math.sqrt(mu * g0 / den); };
+  const ratio = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    const sa = s0 + 6 + k * step;
+    let kk = 0; for (let q = 0; q < 3; q++) kk = Math.max(kk, Math.abs(T.k[Math.floor(mod(sa + q * 2, T.L) / DS) % T.N]));
+    const vc = vcAt(kk + 1e-5), dist = Math.max(1, sa - s0);
+    ratio[k] = v > vc ? (v * v - vc * vc) / (2 * dist) / decMax : 0;
+  }
+  // cada tramo avisa de la curva más exigente que tiene por delante
+  for (let k = n - 2; k >= 0; k--) ratio[k] = Math.max(ratio[k], ratio[k + 1]);
+  for (let k = 0; k < n; k++) {
+    const sa = s0 + 6 + k * step, sb = sa + step * 0.62, t = ratio[k];
+    if (t < 0.35) _gc.copy(G_COL[0]); else if (t < 0.7) _gc.copy(G_COL[0]).lerp(G_COL[1], clamp((t - 0.35) / 0.15, 0, 1)); else _gc.copy(G_COL[1]).lerp(G_COL[2], clamp((t - 0.7) / 0.15, 0, 1));
+    for (const [sx, o] of [[sa, 0], [sb, 6]]) {
+      const P = sampleAt(sx), d = lineAt(sx), rx = -P.tz, rz = P.tx, w = 0.75;
+      pos.set([P.x + rx * (d - w), P.y + 0.06, P.z + rz * (d - w), P.x + rx * (d + w), P.y + 0.06, P.z + rz * (d + w)], k * 12 + o);
+      col.set([_gc.r, _gc.g, _gc.b, _gc.r, _gc.g, _gc.b], k * 12 + o);
+    }
+  }
+  guide.m.geometry.setDrawRange(0, n * 6);
+  guide.m.geometry.attributes.position.needsUpdate = true; guide.m.geometry.attributes.color.needsUpdate = true;
 }
 
 /* ---------- colocar los coches en la escena ---------- */

@@ -185,6 +185,11 @@ function computeTrack(ti) {
     for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += h * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
   }
   Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k });
+  // trazada ideal: hacia el interior de la curva que viene, suavizada
+  const line0 = new Float32Array(N), line = new Float32Array(N);
+  for (let i = 0; i < N; i++) { let ka = 0; for (let j = 4; j <= 32; j += 4) ka += k[(i + j) % N]; line0[i] = clamp(ka / 8 * 650, -ROAD_W / 2 + 1.6, ROAD_W / 2 - 1.6); }
+  for (let i = 0; i < N; i++) { let sm = 0; for (let m = -12; m <= 12; m++) sm += line0[mod(i + m, N)]; line[i] = sm / 25; }
+  T.line = line;
   const cell = 30, grid = new Map();
   for (let i = 0; i < N; i++) { const key = Math.floor(px[i] / cell) + ',' + Math.floor(pz[i] / cell); if (!grid.has(key)) grid.set(key, []); grid.get(key).push(i); }
   T.grid = grid; T.cell = cell;

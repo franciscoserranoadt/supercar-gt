@@ -7,6 +7,7 @@ Juego de carreras de superdeportivos en 3D para Android (motor three.js r187, li
 - 6 coches 3D con pintura reflectante, 10 colores y mejoras de motor, neumáticos y nitro.
 - Modos: Campeonato (6 carreras con puntos), Carrera rápida y Contrarreloj con fantasma.
 - Derrapes y rebufo recargan el nitro; 3 cámaras; controles táctiles, inclinación o mando.
+- Guía de trazada en el asfalto (verde, amarillo, rojo) que se activa en Ajustes o en la pausa.
 
 ## Código
 El juego está en `src3d/` (un archivo por parte). `python3 build.py` dentro de `src3d`

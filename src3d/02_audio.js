@@ -195,8 +195,8 @@ const AU = {
   tick() {
     if (!this.ac || this.song === null || this.ac.state !== 'running') return;
     const s = SONGS[this.song], sp = 60 / s.bpm / 4;
-    if (this.nextT < this.ac.currentTime - 0.5) this.nextT = this.ac.currentTime + 0.05;
-    while (this.nextT < this.ac.currentTime + 0.25) {
+    if (this.nextT < this.ac.currentTime - 0.3) this.nextT = this.ac.currentTime + 0.05;
+    while (this.nextT < this.ac.currentTime + 0.8) {
       const st = this.step, i = st % 16, bar = Math.floor(st / 16), ch = s.prog[bar % s.prog.length], t = this.nextT;
       const intro = bar < 2;
       if (i % 4 === 0 && !intro) this._kick(t);

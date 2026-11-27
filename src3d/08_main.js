@@ -380,8 +380,9 @@ function boot() {
   initRenderer(); resize(); fxInit(); precomputeMaps();
   window.addEventListener('resize', resize);
   AU.playSong(0);
+  setInterval(() => { try { AU.tick(); } catch (e) {} }, 120);   // la música no depende de los fotogramas
   setState('title');
   requestAnimationFrame(t => { lastT = t; frame(t); });
 }
 boot();
-if (/[?&]debug/.test(location.search) || !window.Android) window.__g = { aiInputs, physicsStep, updateRace, input, sampleAt, headingOf, get mode() { return mode; }, startRace, setState, doAction, save, T, get player() { return player; }, get state() { return state; }, get racers() { return racers; }, get raceT() { return raceT; }, set raceT(v) { raceT = v; }, get fps() { return frameAvg; }, standings };
+if (/[?&]debug/.test(location.search) || !window.Android) window.__g = { get scene() { return scene; }, trackCheck, buildTracks, aiInputs, physicsStep, updateRace, input, sampleAt, headingOf, get mode() { return mode; }, startRace, setState, doAction, save, T, get player() { return player; }, get state() { return state; }, get racers() { return racers; }, get raceT() { return raceT; }, set raceT(v) { raceT = v; }, get fps() { return frameAvg; }, standings };

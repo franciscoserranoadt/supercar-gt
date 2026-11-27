@@ -162,7 +162,7 @@ function carStep(r, inp, dt) {
     r.x += (fx * r.vx + rx * r.vy) * h; r.z += (fz * r.vx + rz * r.vy) * h;
     updateProgress(r);
     // muros: rebote con el vector velocidad
-    const ii = r.idx, wl = T.wall[ii] - 1.05;
+    const ii = r.idx, wl = (r.d > 0 ? T.wallR[ii] : T.wallL[ii]) - 1.05;
     if (Math.abs(r.d) > wl) {
       const sd = Math.sign(r.d), ov = Math.abs(r.d) - wl, nx = -T.tz[ii] * sd, nz = T.tx[ii] * sd;
       r.x -= nx * ov; r.z -= nz * ov; r.d = sd * wl;
@@ -424,6 +424,7 @@ function updateCamera(dt, r, cine) {
   const fov = 60 + Math.min(v, 100) * 0.14 + (r.boost ? 7 : 0);
   camera.fov = damp(camera.fov, fov, 3, dt); camera.updateProjectionMatrix();
   if (headLight && headLight.visible) { headLight.position.set(r.x + fx * 1.5, r.y + 1.1, r.z + fz * 1.5); headLight.target.position.set(r.x + fx * 40, r.y, r.z + fz * 40); }
+  if (window.__camOverride) { const o = window.__camOverride; camera.position.set(o.p[0], o.p[1], o.p[2]); if (o.top) camera.up.set(0, 0, -1); camera.lookAt(o.l[0], o.l[1], o.l[2]); camera.up.set(0, 1, 0); camera.fov = o.fov || 50; camera.updateProjectionMatrix(); }
 }
 
 /* ---------- partículas: humo, polvo, chispas y nitro ---------- */

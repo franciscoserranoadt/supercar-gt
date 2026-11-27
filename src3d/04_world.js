@@ -185,9 +185,13 @@ function computeTrack(ti) {
     for (let m = 0; m <= L0; m++) py[mod(a0 + m, N)] += h * (1 - Math.cos(2 * Math.PI * m / L0)) / 2;
   }
   Object.assign(T, { N, L: N * DS, px, py, pz, tx, tz, k });
+  // curvatura "de pico" (poco suavizada) para calcular a qué velocidad se puede pasar
+  const kp = new Float32Array(N);
+  for (let i = 0; i < N; i++) { let m = 0; for (let q = -3; q <= 3; q++) m = Math.max(m, Math.abs(k0[mod(i + q, N)])); kp[i] = Math.max(m * 0.85, Math.abs(k[i])); }
+  T.kp = kp;
   // trazada ideal: hacia el interior de la curva que viene, suavizada
   const line0 = new Float32Array(N), line = new Float32Array(N);
-  for (let i = 0; i < N; i++) { let ka = 0; for (let j = 4; j <= 32; j += 4) ka += k[(i + j) % N]; line0[i] = clamp(ka / 8 * 650, -ROAD_W / 2 + 1.6, ROAD_W / 2 - 1.6); }
+  for (let i = 0; i < N; i++) { let ka = 0; for (let j = -6; j <= 18; j += 2) ka += k[mod(i + j, N)]; line0[i] = clamp(ka / 13 * 420, -3.4, 3.4); }
   for (let i = 0; i < N; i++) { let sm = 0; for (let m = -12; m <= 12; m++) sm += line0[mod(i + m, N)]; line[i] = sm / 25; }
   T.line = line;
   const cell = 30, grid = new Map();

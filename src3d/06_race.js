@@ -29,16 +29,15 @@ function startRace(ti, md) {
   const pm = save.car, st = carStats(pm);
   const pslot = mode === 'trial' ? 0 : 6;
   player = makeRacer(pm, PAINT[save.colors[pm] ?? CARS[pm].paint], 'TÚ', pslot, true, st);
-  Object.assign(player, { vx: 0, vy: 0, r: 0, ax: 0, wv: 0, vh: player.yaw, steer: 0, drift: 0, nitro: st.nitro, boost: false, lapStart: 0, lapTimes: [], idx: 0, sLast: 0, base: 0, stuck: 0, draft: 0, wrong: 0, crashCD: 0, latA: 0, lonA: 0, rough: 0 });
-  initPlayerProgress();
+  initCarState(player);
+  Object.assign(player, { nitro: st.nitro, lapStart: 0, lapTimes: [] });
   racers = [player];
   if (mode !== 'trial') {
     const field = mode === 'champ' && save.champ ? save.champ.field : makeField();
     const slots = [0, 1, 2, 3, 4, 5, 7];
     field.forEach((f, k) => {
-      const r = makeRacer(f.m, f.color, f.name, slots[k], false);
-      const baseTop = ([300, 318, 334][save.diff] + ti * 3) / 3.6;
-      r.top = baseTop * f.skill; r.grip = [1.36, 1.52, 1.7][save.diff] * (0.97 + (f.skill - 0.95) * 1.0); if (theme.rain) r.grip *= 0.82; r.lane = (k % 3 - 1) * 1.6; r.idx = 0;
+      const r = makeRacer(f.m, f.color, f.name, slots[k], false, carStats(f.m, { motor: save.diff, grip: 1, nitro: 0 }));
+      setupRival(r, f.skill, k);
       rivals.push(r); racers.push(r);
     });
   } else setupGhost(ti);
@@ -46,6 +45,12 @@ function startRace(ti, md) {
   raceT = -4.2; results = null; msg = null; paused = false; lastCount = 5; camInit = false;
   setState('race');
   AU.playSong(1); AU.engineOn();
+}
+function setupRival(r, skill, k) {
+  const d = save.diff, sk = 0.97 + (skill - 0.95) * 0.8;
+  r.muMul = [0.9, 0.955, 1.0][d] * sk; r.basePow = r.powMul = [0.9, 0.98, 1.04][d] * sk; r.planMul = [0.93, 0.97, 1.0][d];
+  r.lane = (k % 3 - 1) * 1.5; r.lap = 1;
+  initCarState(r);
 }
 function makeField() {
   const names = RIVAL_NAMES.slice().sort(() => Math.random() - 0.5), out = [];
@@ -78,201 +83,244 @@ function updateProgress(r) {
   r.sLast = s; r.prog = r.base + s - S0();
 }
 
-/* ---------- física del jugador: modelo de bicicleta con neumáticos ---------- */
-const GRIP_BASE = 1.75;
-function brakeTurn(p, st) { return input.brake && Math.abs(st) > 0.3 && p.vx > 20; }
-const PHY = { m: 1450, Iz: 2350, a: 1.22, b: 1.48, h: 0.46, g: 9.81, rho: 1.2, ClA: 2.6, B: 14, C: 1.6 };
-function tireF(alpha, Fz, mu) { return mu * Fz * Math.sin(PHY.C * Math.atan(PHY.B * alpha)); }
-function updatePlayer(dt) {
-  const p = player, st = p.stats, go = raceT >= 0 && !p.finished;
-  let steerIn = input.steer, gas, brake = input.brake, nit = input.nitro;
-  if (p.finished) { // conducción automática tras la meta
-    const ah = sampleAt(p.prog + S0() + 25), want = headingOf(ah.tx, ah.tz) + p.d * 0.02;
-    steerIn = clamp(-angDiff(p.yaw, want) * 3, -1, 1); gas = p.vx < 30; brake = p.vx > 35; nit = false;
-  } else gas = save.autoGas ? !brake : input.gas;
-  if (!go && !p.finished) { gas = false; brake = true; }
-  const onRoad = Math.abs(p.d) < ROAD_W / 2 + KERB_W * 0.7;
-  const wet = theme.rain ? 0.8 : 1, mu = 1.45 * st.grip * wet * (onRoad ? 1 : 0.55);
-  // rebufo
-  p.draft = 0;
-  for (const r of rivals) { const ds = r.prog - p.prog; if (ds > 5 && ds < 32 && Math.abs(r.d - p.d) < 1.7) p.draft = 1; }
+/* ---------- FÍSICA DE COCHE: la misma para el jugador y los rivales ---------- */
+const PHY = { m: 1450, Iz: 2400, a: 1.25, b: 1.45, h: 0.3, g: 9.81, rho: 1.2, ClA: 2.6, kf: 14, kr: 21 };
+const MU = 1.6;                                    // agarre del neumático en seco
+const C_AERO = 0.5 * PHY.rho * PHY.ClA / PHY.m;    // carga aerodinámica por (m/s)²
+const GRIP_BASE = MU;
+function carMu(r) { return MU * r.stats.grip * (theme.rain ? 0.8 : 1) * (r.onRoad === false ? 0.6 : 1) * (r.muMul || 1); }
+function steerLimit(r) {   // ángulo de volante máximo: a fondo = algo más de lo que permite el agarre
+  const v = Math.max(Math.abs(r.vx), 1), mu = carMu(r);
+  return Math.min(0.55, Math.atan(WHEELBASE * mu * (PHY.g + C_AERO * v * v) / (v * v)) + 0.075);
+}
+function initCarState(r) {
+  Object.assign(r, { vx: 0, vy: 0, r: 0, axF: 0, ay: 0, steer: 0, drift: 0, slip: 0, boost: false, draft: 0, onRoad: true,
+    roll: 0, rollV: 0, pitchB: 0, pitchV: 0, heave: 0, crashCD: 0, stuck: 0, wrong: 0, idx: 0, sLast: 0, base: 0, rough: 0 });
+  r.idx = Math.floor(mod(r.prog + S0(), T.L) / DS);
+  const s = locate(r); r.sLast = s; r.base = r.prog + S0() - s;
+}
+function carStep(r, inp, dt) {
+  const st = r.stats, go = raceT >= 0, wet = theme.rain ? 0.8 : 1;
+  r.onRoad = Math.abs(r.d) < ROAD_W / 2 + KERB_W * 0.7;
+  const mu = carMu(r), muR = mu * 1.12;
+  // volante con velocidad de giro limitada
+  r.steer += clamp(inp.steer * steerLimit(r) - r.steer, -3.2 * dt, 3.2 * dt);
   // nitro
-  p.boost = false;
-  if (go && nit && p.nitro > 0.05 && gas && p.vx > 5) {
-    if (!p.wasBoost) { AU.nitro(); vibrate(40); }
-    p.boost = true; p.nitro = Math.max(0, p.nitro - dt);
-  }
-  p.wasBoost = p.boost;
-  // dirección: ángulo máximo según velocidad; a fondo da el giro máximo que permite el agarre
-  {
-    const v = Math.max(Math.abs(p.vx), 1), cA0 = 0.5 * PHY.rho * PHY.ClA / PHY.m;
-    const mu0 = GRIP_BASE * st.grip * (theme.rain ? 0.8 : 1) * (onRoad ? 1 : 0.6);
-    const gripSteer = Math.atan(WHEELBASE * mu0 * (PHY.g + cA0 * v * v) / (v * v)) * (brakeTurn(p, steerIn) ? 1.6 : 1.12);
-    const dMax = Math.min(0.62 / (1 + v / 30), gripSteer);
-    p.steer += clamp(steerIn * dMax - p.steer, -4.5 * dt, 4.5 * dt);
-  }
-  const vtop = st.top / 3.6, P = 440e3 * st.acc * (p.boost ? 1.45 * st.boost : 1);
-  const CdA = 2 * 440e3 * st.acc / (PHY.rho * vtop * vtop * vtop) * (p.draft ? 0.82 : 1);
-  const cA = 0.5 * PHY.rho * PHY.ClA / PHY.m, g0 = PHY.g;
-  const muLat = GRIP_BASE * st.grip * wet * (onRoad ? 1 : 0.6);
-  const n = 3, h = dt / n;
-  let crashV = 0, over = 0;
+  const wantBoost = go && inp.nitro && r.nitro > 0.05 && inp.throttle > 0.5 && r.vx > 5;
+  if (wantBoost && !r.boost && r.isPlayer) { AU.nitro(); vibrate(40); }
+  r.boost = wantBoost; if (r.boost) r.nitro = Math.max(0, r.nitro - dt);
+  const vtop = st.top / 3.6, Pw = 440e3 * st.acc * (r.powMul || 1) * (r.boost ? 1.45 * st.boost : 1);
+  const CdA = 2 * 440e3 * st.acc / (PHY.rho * vtop * vtop * vtop) * (r.draft ? 0.82 : 1);
+  const n = 4, h = dt / n, L = WHEELBASE;
+  let crash = 0;
   for (let it = 0; it < n; it++) {
-    const v = p.vx, av = Math.abs(v);
-    let a = 0;
-    if (go || p.finished) {
-      if (brake && v > 0.5) a = -1.4 * wet * (onRoad ? 1 : 0.7) * (g0 + cA * v * v) * (brakeTurn(p, steerIn) ? 0.75 : 1);
-      else if (brake && v <= 0.5 && go) a = -4;
-      else if (gas) a = Math.min(P / Math.max(v, 6) / PHY.m, 8.5 * st.acc * (p.boost ? 1.3 : 1));
-      else a = -Math.sign(v) * 0.6;
-    } else a = -Math.sign(v) * Math.min(av / h, 6);
-    a -= Math.sign(v) * (0.5 * PHY.rho * CdA * v * v + 160) / PHY.m;
-    if (!onRoad) a -= Math.sign(v) * 0.22 * g0 * Math.min(1, av / 5) + v * 0.25;
-    p.vx = v + a * h; if (p.vx < -9) p.vx = -9;
-    if (!(go || p.finished) && Math.abs(p.vx) < 0.3) p.vx = 0;
-    p.ax = lerp(p.ax || 0, a, 0.1);
-    // giro: la trayectoria gira lo que permite el agarre; si pides más, el coche desliza
-    const vv = Math.max(Math.abs(p.vx), 0.1);
-    const brakeUse = brake && p.vx > 1 ? 0.15 : 0;
-    const rMax = muLat * (1 - brakeUse) * (g0 + cA * p.vx * p.vx) / Math.max(vv, 3);
-    const rDes = p.vx * Math.tan(-p.steer) / WHEELBASE;
-    const rPath = vv < 3 ? rDes : clamp(rDes, -rMax, rMax);
-    p.wv = damp(p.wv || 0, rPath, 14, h);
-    p.vh = (p.vh ?? p.yaw) + p.wv * h;
-    if (rDes && vv > 15) over = Math.max(over, Math.abs(rDes) / rMax - 1);
-    const fx = Math.cos(p.vh), fz = -Math.sin(p.vh);
-    p.x += fx * p.vx * h; p.z += fz * p.vx * h;
-    updateProgress(p);
-    const ii = p.idx, wl = T.wall[ii] - 1.05;
-    if (Math.abs(p.d) > wl) {
-      const sd = Math.sign(p.d), ov = Math.abs(p.d) - wl, nx = -T.tz[ii] * sd, nz = T.tx[ii] * sd;
-      p.x -= nx * ov; p.z -= nz * ov; p.d = sd * wl;
-      let Vx = fx * p.vx, Vz = fz * p.vx;
+    const vx = r.vx, vy = r.vy, w = r.r, down = 0.5 * PHY.rho * PHY.ClA * vx * vx;
+    const axT = clamp(r.axF, -10, 8);
+    const Fzf = Math.max(800, PHY.m * PHY.g * PHY.b / L + down * 0.45 - PHY.m * axT * PHY.h / L);
+    const Fzr = Math.max(800, PHY.m * PHY.g * PHY.a / L + down * 0.55 + PHY.m * axT * PHY.h / L);
+    // fuerzas longitudinales pedidas
+    let Fxf = 0, Fxr = 0;
+    if (go || r.finished) {
+      if (inp.brake > 0 && vx > 0.5) { const Fb = inp.brake * mu * (Fzf + Fzr) * 0.95; Fxf = -Fb * 0.6; Fxr = -Fb * 0.4; }
+      else if (inp.brake > 0 && vx <= 0.5 && r.isPlayer) Fxr = -PHY.m * 4;               // marcha atrás
+      else if (inp.throttle > 0) { const tcs = (r.slipR || 0) > 0.07 ? clamp(1 - ((r.slipR || 0) - 0.07) * 12, 0.25, 1) : 1; const Fd = inp.throttle * tcs * Math.min(Pw / Math.max(vx, 6), PHY.m * 8.5 * st.acc * (r.boost ? 1.3 : 1)); Fxf = Fd * 0.4; Fxr = Fd * 0.6; }
+      else Fxr = -Math.sign(vx) * 800;                                                    // freno motor
+    } else if (Math.abs(vx) > 0.05) Fxr = -Math.sign(vx) * PHY.m * 6;
+    // fuerzas laterales: curva suave (agarre progresivo, sin latigazos)
+    let Fyf = 0, Fyr = 0;
+    const slow = Math.abs(vx) < 4;
+    if (!slow) {
+      const af = r.steer - Math.atan2(vy + PHY.a * w, Math.abs(vx)), ar = -Math.atan2(vy - PHY.b * w, Math.abs(vx));
+      Fyf = mu * Fzf * Math.tanh(PHY.kf * af); Fyr = muR * Fzr * Math.tanh(PHY.kr * ar);
+      r.slipA = Math.max(Math.abs(af), Math.abs(ar)); r.slipR = Math.abs(ar);
+    } else r.slipA = 0;
+    // círculo de fricción: ABS y control de tracción
+    const remF = Math.sqrt(Math.max((0.3 * mu * Fzf) ** 2, (mu * Fzf) ** 2 - Fyf * Fyf)), remR = Math.sqrt(Math.max((0.3 * muR * Fzr) ** 2, (muR * Fzr) ** 2 - Fyr * Fyr));
+    Fxf = clamp(Fxf, -remF, remF); Fxr = clamp(Fxr, -remR, remR);
+    const cF = Math.sqrt(Math.max(0, (mu * Fzf) ** 2 - Fxf * Fxf)), cR = Math.sqrt(Math.max(0, (muR * Fzr) ** 2 - Fxr * Fxr));
+    Fyf = clamp(Fyf, -cF, cF); Fyr = clamp(Fyr, -cR, cR);
+    const av = Math.abs(vx);
+    const res = Math.sign(vx) * (0.5 * PHY.rho * CdA * vx * vx + 160 + (r.onRoad ? 0 : PHY.m * (2.2 * Math.min(1, av / 5) + av * 0.25)));
+    const cs = Math.cos(r.steer), sn = Math.sin(r.steer);
+    if (slow) {   // a poca velocidad, giro geométrico
+      const ax = (Fxf * cs + Fxr - res) / PHY.m;
+      r.vx += ax * h; r.r = r.vx * Math.tan(r.steer) / L; r.vy *= 0.85; r.axF = lerp(r.axF, ax, 0.1); r.ay = lerp(r.ay, r.vx * r.r, 0.2);
+    } else {
+      const ax = (Fxf * cs - Fyf * sn + Fxr - res) / PHY.m + vy * w;
+      const ay = (Fyf * cs + Fxf * sn + Fyr) / PHY.m - vx * w;
+      let dr = (PHY.a * (Fyf * cs + Fxf * sn) - PHY.b * Fyr) / PHY.Iz;
+      const beta = Math.atan2(vy, av);
+      if (beta * w < 0 && Math.abs(beta) > 0.06) dr -= Math.sign(w) * 40 * (Math.abs(beta) - 0.06);   // control de estabilidad
+      dr -= w * 0.25;
+      r.vx += ax * h; r.vy += ay * h; r.r += dr * h;
+      r.axF = lerp(r.axF, ax - vy * w, 0.05); r.ay = lerp(r.ay, ay + vx * w, 0.2);
+    }
+    if (r.vx < -9) r.vx = -9;
+    if (!(go || r.finished) && Math.abs(r.vx) < 0.2) { r.vx = 0; r.vy = 0; r.r = 0; }
+    r.yaw -= r.r * h;
+    const fx = Math.cos(r.yaw), fz = -Math.sin(r.yaw), rx = Math.sin(r.yaw), rz = Math.cos(r.yaw);
+    r.x += (fx * r.vx + rx * r.vy) * h; r.z += (fz * r.vx + rz * r.vy) * h;
+    updateProgress(r);
+    // muros: rebote con el vector velocidad
+    const ii = r.idx, wl = T.wall[ii] - 1.05;
+    if (Math.abs(r.d) > wl) {
+      const sd = Math.sign(r.d), ov = Math.abs(r.d) - wl, nx = -T.tz[ii] * sd, nz = T.tx[ii] * sd;
+      r.x -= nx * ov; r.z -= nz * ov; r.d = sd * wl;
+      let Vx = fx * r.vx + rx * r.vy, Vz = fz * r.vx + rz * r.vy;
       const vn = Vx * nx + Vz * nz;
       if (vn > 0) {
-        Vx -= 1.2 * vn * nx; Vz -= 1.2 * vn * nz;
-        const tf = 1 - Math.min(0.35, vn * 0.025); Vx *= tf; Vz *= tf;
-        const sp = Math.hypot(Vx, Vz);
-        const back = p.vx < 0;
-        p.vx = (back ? -1 : 1) * sp; if (sp > 0.5) p.vh = Math.atan2(-Vz, Vx) + (back ? Math.PI : 0);
-        p.wv *= 0.3; crashV = Math.max(crashV, vn); p.wallSide = sd;
+        Vx -= 1.25 * vn * nx; Vz -= 1.25 * vn * nz;
+        const tf = 1 - Math.min(0.3, vn * 0.02); Vx *= tf; Vz *= tf;
+        r.vx = Vx * fx + Vz * fz; r.vy = Vx * rx + Vz * rz;
+        if (vn > 3) { r.r = r.r * 0.5 - sd * vn * 0.04; }
+        crash = Math.max(crash, vn); r.wallSide = sd;
       }
     }
   }
-  // ángulo de derrape (visual y para el nitro): el morro gira más que la trayectoria
-  const bt = brakeTurn(p, steerIn) && go;
-  const driftTarget = p.vx > 16 ? clamp(over * 0.3 + (bt ? 0.22 : 0), 0, 0.38) * Math.sign(-p.steer || 0) : 0;
-  p.drift = damp(p.drift || 0, driftTarget, driftTarget ? 4 : 5, dt);
-  if (over > 0) p.vx -= Math.min(over, 1.5) * (bt ? 5 : 3) * dt * Math.sign(p.vx);
-  p.yaw = p.vh + p.drift;
-  p.r = -p.wv; p.vy = 0;
-  p.latA = p.vx * p.wv;
-  p.v = Math.abs(p.vx);
-  p.crashCD -= dt;
-  if (crashV > 0) {
-    if (crashV > 6 && p.crashCD <= 0) { AU.crash(); vibrate(160); shake = Math.min(1, crashV / 15); p.crashCD = 0.5; sparks(p, p.wallSide); }
-    else if (p.crashCD <= 0) { AU.bump(); p.crashCD = 0.25; }
+  r.v = Math.hypot(r.vx, r.vy);
+  r.drift = r.vx > 12 ? Math.atan2(r.vy, r.vx) : 0;
+  r.slip = clamp(((r.slipA || 0) - 0.08) * 6, 0, 1);
+  const a0 = r.idx, a1 = (a0 + 1) % T.N;
+  r.y = T.py[a0] + (T.py[a1] - T.py[a0]) * clamp((r.sLast - a0 * DS) / DS, 0, 1);
+  r.pitch = Math.atan((T.py[a1] - T.py[mod(a0 - 1, T.N)]) / (2 * DS));
+  r.rough = !r.onRoad ? 1 : (Math.abs(r.d) > ROAD_W / 2 - 0.3 ? 0.4 : 0);
+  r.brk = inp.brake > 0 && r.vx > 1;
+  r.latA = r.ay;
+  r.lonA = r.axF;
+  return crash;
+}
+
+/* ---------- piloto de los rivales: gira, acelera y frena como una persona ---------- */
+function aiInputs(r, dt) {
+  const go = raceT >= 0, s = r.prog + S0(), v = Math.max(r.vx, 0), idx = r.idx;
+  const lim = ROAD_W / 2 - 1.8;
+  // trazada ideal + carril propio en recta
+  let td = clamp(lineAt(s + 10), -3.6, 3.6) + (r.lane || 0) * (1 - Math.min(1, Math.abs(T.k[idx]) * 250));
+  // coche delante en su carril: elegir un lado para adelantar y mantenerlo
+  let blocker = null;
+  for (const o of racers) { if (o === r) continue; const ds = o.prog - r.prog; if (ds > 0 && ds < 28 && Math.abs(o.d - r.d) < 2.4) { if (!blocker || ds < blocker.ds) blocker = { o, ds }; } }
+  let vCap = 999;
+  if (blocker && blocker.o.v < v + 3) {
+    const o = blocker.o;
+    if (r.blk !== o) { r.blk = o; const roomL = (o.d - 3.3) > -lim, roomR = (o.d + 3.3) < lim; r.side = roomL && roomR ? (r.d < o.d ? -1 : 1) : (roomL ? -1 : 1); }
+    td = clamp(o.d + r.side * 3.3, -lim, lim);
+    if (blocker.ds < 12 && Math.abs(r.d - o.d) < 1.9) vCap = o.v - 1;
+    r.blkT = 0;
+  } else if (r.blk && (r.blkT = (r.blkT || 0) + dt) > 1.5) r.blk = null;
+  r.td = clamp(td, -lim, lim);
+  // punto al que mira (persecución pura)
+  const Ld = 6 + v * 0.3, P = sampleAt(s + Ld), tdl = clamp(r.td, -lim, lim);
+  const tx = P.x - P.tz * tdl, tz = P.z + P.tx * tdl;
+  const fx = Math.cos(r.yaw), fz = -Math.sin(r.yaw), rx = Math.sin(r.yaw), rz = Math.cos(r.yaw);
+  const dx = tx - r.x, dz = tz - r.z, lx = dx * fx + dz * fz, ly = dx * rx + dz * rz;
+  const alpha = Math.atan2(ly, Math.max(lx, 1)), kappa = 2 * Math.sin(alpha) / Ld;
+  // persecución + corrección si se separa de su línea
+  const delta = Math.atan(WHEELBASE * kappa) + Math.atan2(r.vy, Math.max(v, 5)) * 0.6 + clamp((r.d - r.td) * -0.004, -0.03, 0.03);
+  let steer = clamp(delta / steerLimit(r), -1, 1);
+  // velocidad: frena a tiempo para las curvas que vienen
+  const mu = carMu(r) * 0.82 * (r.planMul || 1) * (theme.rain ? 0.93 : 1);
+  let vt = r.stats.top / 3.6 * (r.powMul || 1) * 1.1;
+  for (let j = 2; j < 160; j += 2) {
+    const k = T.kp[(idx + j) % T.N] + 1e-5, den = k - mu * C_AERO, vc = den <= 1e-6 ? 999 : Math.sqrt(mu * PHY.g / den);
+    const dec = mu * (PHY.g + C_AERO * vc * vc) * 0.8;
+    vt = Math.min(vt, Math.sqrt(vc * vc + 2 * dec * j * DS));
   }
-  p.slip = clamp(over * 1.5 + Math.abs(p.drift) * 2, 0, 1);
-  if (Math.abs(p.drift) > 0.1 && p.vx > 18 && go) { p.nitro = Math.min(st.nitro, p.nitro + dt * 0.5 * Math.min(1, Math.abs(p.drift) / 0.25)); if (!p.driftMsg) { p.driftMsg = 1; showMsg('¡DERRAPE! +NITRO', '#7fe8ff', 0.9); } } else p.driftMsg = 0;
-  if (p.draft && go) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.18);
-  if (go && !p.boost) p.nitro = Math.min(st.nitro, p.nitro + dt * 0.035);
-  p.lonA = p.ax || 0;
-  // contacto con rivales
-  for (const r of rivals) {
-    const ds = r.prog - p.prog, dd = r.d - p.d;
-    if (Math.abs(ds) < 4.5 && Math.abs(dd) < 1.95) {
-      const ox = 4.5 - Math.abs(ds), oy = 1.95 - Math.abs(dd), rx = -T.tz[p.idx], rz = T.tx[p.idx];
-      if (oy < ox * 0.7) {
-        const sd = Math.sign(dd) || 1; p.x -= rx * sd * oy * 0.5; p.z -= rz * sd * oy * 0.5; r.dv = (r.dv || 0) + sd * 2.5;
-        p.vy -= sd * 1.2; p.vx *= 0.99; r.v *= 0.985;
-        if (p.crashCD <= 0) { AU.bump(); vibrate(40); p.crashCD = 0.3; shake = 0.3; }
-      } else if (ds > 0 && p.vx > r.v) {
-        const rel = p.vx - r.v; p.vx = r.v * 0.97; r.v += rel * 0.3; p.x -= T.tx[p.idx] * ox; p.z -= T.tz[p.idx] * ox;
-        if (p.crashCD <= 0) { AU.bump(); vibrate(60); p.crashCD = 0.3; shake = Math.min(1, rel / 10); }
-      } else if (ds < 0 && r.v > p.vx) { r.v = Math.max(0, p.vx) * 0.97; r.prog -= ox * 0.3; }
+  vt = Math.min(vt, vCap);
+  let throttle = 0, brake = 0;
+  if (!go) brake = 1;
+  else if (v < vt - 0.3) throttle = clamp((vt - v) / 2, 0.3, 1);
+  else if (v > vt + 0.3) brake = clamp((v - vt) / 1.5, 0.5, 1);
+  // si va derrapando, suelta gas
+  if (Math.abs(r.drift) > 0.15) throttle *= 0.5;
+  return { steer, throttle, brake, nitro: false };
+}
+function playerInputs(p) {
+  if (p.finished) { const a = aiInputs(p, 0); a.throttle = Math.min(a.throttle, p.vx < 28 ? 1 : 0); return a; }
+  const brake = input.brake ? 1 : 0, gas = save.autoGas ? !input.brake : input.gas;
+  return { steer: input.steer, throttle: gas ? 1 : 0, brake, nitro: input.nitro };
+}
+/* ---------- choques entre coches: impulsos con rebote y giro ---------- */
+const CIRC = [-1.55, 0, 1.55], CR = 0.98;
+function collideCars() {
+  for (let i = 0; i < racers.length; i++) for (let j = i + 1; j < racers.length; j++) {
+    const A = racers[i], B = racers[j];
+    if (Math.abs(A.x - B.x) > 7 || Math.abs(A.z - B.z) > 7) continue;
+    let hit = null;
+    const afx = Math.cos(A.yaw), afz = -Math.sin(A.yaw), bfx = Math.cos(B.yaw), bfz = -Math.sin(B.yaw);
+    for (const oa of CIRC) for (const ob of CIRC) {
+      const ax = A.x + afx * oa, az = A.z + afz * oa, bx = B.x + bfx * ob, bz = B.z + bfz * ob;
+      const dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz);
+      if (d < CR * 2 && (!hit || d < hit.d)) hit = { d, nx: dx / (d || 1), nz: dz / (d || 1), cx: (ax + bx) / 2, cz: (az + bz) / 2 };
+    }
+    if (!hit) continue;
+    const ov = CR * 2 - hit.d;
+    A.x -= hit.nx * ov / 2; A.z -= hit.nz * ov / 2; B.x += hit.nx * ov / 2; B.z += hit.nz * ov / 2;
+    const vel = c => { const fx = Math.cos(c.yaw), fz = -Math.sin(c.yaw), rx = Math.sin(c.yaw), rz = Math.cos(c.yaw); return [fx * c.vx + rx * c.vy, fz * c.vx + rz * c.vy]; };
+    const setVel = (c, Vx, Vz) => { const fx = Math.cos(c.yaw), fz = -Math.sin(c.yaw), rx = Math.sin(c.yaw), rz = Math.cos(c.yaw); c.vx = Vx * fx + Vz * fz; c.vy = Vx * rx + Vz * rz; };
+    const [ax, az] = vel(A), [bx, bz] = vel(B);
+    const rel = (bx - ax) * hit.nx + (bz - az) * hit.nz;
+    if (rel < 0) {
+      const jn = -(1 + 0.3) * rel / 2;
+      // rozamiento lateral entre carrocerías
+      const tx = -hit.nz, tz = hit.nx, relT = (bx - ax) * tx + (bz - az) * tz, jt = clamp(-relT / 2, -jn * 0.3, jn * 0.3);
+      const Jx = hit.nx * jn + tx * jt, Jz = hit.nz * jn + tz * jt;
+      setVel(A, ax - Jx, az - Jz); setVel(B, bx + Jx, bz + Jz);
+      // el golpe hace girar el coche según dónde le den
+      const torque = (c, sgn) => { const rxw = hit.cx - c.x, rzw = hit.cz - c.z, ty = rzw * (Jx * sgn) - rxw * (Jz * sgn); c.r -= ty * PHY.m / PHY.Iz * 0.6; };
+      torque(A, -1); torque(B, 1);
+      const pl = A.isPlayer ? A : B.isPlayer ? B : null;
+      if (pl && pl.crashCD <= 0 && -rel > 1.5) { AU.bump(); vibrate(Math.min(150, 30 - rel * 8)); shake = Math.min(1, -rel / 10); pl.crashCD = 0.3; }
     }
   }
-  // atasco o dirección contraria: recolocar
-  const rel = Math.abs(angDiff(headingOf(T.tx[p.idx], T.tz[p.idx]), p.yaw));
-  p.wrong = rel > 1.9 && p.v > 4 ? p.wrong + dt : 0;
-  p.stuck = go && (p.v < 3 && (Math.abs(p.d) > ROAD_W / 2 || rel > 1.2)) ? p.stuck + dt : 0;
-  if (p.stuck > 3 || p.wrong > 3) respawn(p);
-  const a0 = p.idx, a1 = (a0 + 1) % T.N;
-  p.y = T.py[a0] + (T.py[a1] - T.py[a0]) * clamp((p.sLast - a0 * DS) / DS, 0, 1);
-  p.pitch = Math.atan((T.py[a1] - T.py[mod(a0 - 1, T.N)]) / (2 * DS));
-  p.rough = !onRoad ? 1 : (Math.abs(p.d) > ROAD_W / 2 - 0.3 ? 0.4 : 0);
-  if (!onRoad && p.v > 8) shake = Math.max(shake, 0.12);
-  // vueltas
-  if (!p.finished && p.prog >= p.lap * T.L) {
-    const lt = raceT - p.lapStart; p.lapTimes.push(lt); p.lapStart = raceT; p.lap++;
-    if (mode === 'trial') ghostLap(lt);
-    if (p.lap > track.laps) { p.finished = true; p.time = raceT; finishRace(); }
-    else { AU.lap(); showMsg(p.lap === track.laps ? '¡VUELTA FINAL!' : 'VUELTA ' + p.lap, '#ffd24a', 1.8); }
-  }
-  if (mode === 'trial' && ghostRec && go) recordGhost();
 }
 function respawn(p) {
   const s = sampleAt(p.prog + S0());
-  p.x = s.x; p.z = s.z; p.yaw = p.vh = headingOf(s.tx, s.tz); p.v = p.vx = p.vy = p.r = p.wv = 0; p.steer = 0; p.stuck = 0; p.wrong = 0; p.drift = 0; p.d = 0;
-  showMsg('RECOLOCADO', '#ffffff', 1.2);
+  p.x = s.x; p.z = s.z; p.yaw = headingOf(s.tx, s.tz); p.v = p.vx = p.vy = p.r = 0; p.steer = 0; p.stuck = 0; p.wrong = 0; p.drift = 0; p.d = 0; p.axF = 0;
+  if (p.isPlayer) showMsg('RECOLOCADO', '#ffffff', 1.2);
 }
-
-/* ---------- rivales ---------- */
-function updateRivals(dt) {
+/* ---------- un paso de simulación para todos los coches ---------- */
+function physicsStep(dt) {
   const go = raceT >= 0;
-  for (const r of rivals) {
-    const s = r.prog + S0(), idx = Math.floor(mod(s, T.L) / DS);
-    // velocidad objetivo según las curvas que vienen
-    let vt = r.top;
-    const cAero = 0.5 * PHY.rho * PHY.ClA / PHY.m, vcAt = k => { const den = k - r.grip * cAero; return den <= 1e-6 ? 999 : Math.sqrt(r.grip * PHY.g / den); };
-    for (let j = 2; j < 120; j += 2) {
-      const vc = vcAt(Math.abs(T.k[(idx + j) % T.N]) + 1e-5);
-      vt = Math.min(vt, Math.sqrt(vc * vc + 2 * r.grip * PHY.g * 0.85 * j * DS));
+  for (const r of racers) {
+    // rebufo: coche delante y cerca
+    r.draft = 0;
+    for (const o of racers) { if (o === r) continue; const ds = o.prog - r.prog; if (ds > 5 && ds < 32 && Math.abs(o.d - r.d) < 1.7) { r.draft = 1; break; } }
+    const inp = r.isPlayer ? playerInputs(r) : aiInputs(r, dt);
+    r.inp = inp;
+    const crash = carStep(r, inp, dt);
+    r.crashCD -= dt;
+    if (r.isPlayer && crash > 0 && r.crashCD <= 0) {
+      if (crash > 6) { AU.crash(); vibrate(160); shake = Math.min(1, crash / 15); r.crashCD = 0.5; sparks(r, r.wallSide); }
+      else { AU.bump(); r.crashCD = 0.25; }
     }
-    vt = Math.min(vt, vcAt(Math.abs(T.k[idx]) + 1e-5) * 1.01);
-    if (!player.finished) { const gap = r.prog - player.prog; if (gap > 60) vt *= 0.965; else if (gap < -90) vt *= 1.035; }
-    if (!go) vt = 0;
-    // evitar a los coches de delante
-    let blocker = null;
-    for (const o of racers) { if (o === r) continue; const ds = o.prog - r.prog; if (ds > 0 && ds < 22 && Math.abs(o.d - r.d) < 2.2 && o.v < r.v + 1) { if (!blocker || ds < blocker.ds) blocker = { o, ds }; } }
-    let kA = 0; for (let j = 8; j < 36; j += 4) kA += T.k[(idx + j) % T.N]; kA /= 7;
-    let td = clamp(kA * 650, -4.2, 4.2) + r.lane * (1 - Math.min(1, Math.abs(kA) * 300));
-    const lim = ROAD_W / 2 - 1.4;
-    if (blocker) {
-      const o = blocker.o;
-      // elige un lado para adelantar y lo mantiene (sin cambiar de lado a cada momento)
-      if (r.blk !== o) { r.blk = o; const roomL = (o.d - 3.2) > -lim, roomR = (o.d + 3.2) < lim; r.side = roomL && roomR ? (r.d < o.d ? -1 : 1) : (roomL ? -1 : 1); }
-      td = clamp(o.d + r.side * 3.2, -lim, lim);
-      if (blocker.ds < 8 && Math.abs(td - r.d) > 1.5) vt = Math.min(vt, o.v - 0.5);
-    } else if (r.blk && (r.blkT = (r.blkT || 0) + dt) > 1.2) { r.blk = null; r.blkT = 0; }
-    r.td = go ? clamp(td, -lim, lim) : r.d;
-    // movimiento lateral suave (con inercia)
-    if (go) {
-      const want = clamp((r.td - r.d) * 1.6, -3.5, 3.5);
-      r.dv = (r.dv || 0) + clamp(want - (r.dv || 0), -7 * dt, 7 * dt);
-      r.d += r.dv * dt;
-    } else r.dv = 0;
-    const acc = r.v < vt ? 8 * (1 - r.v / (r.top * 1.05)) + 0.8 : -r.grip * PHY.g * 0.9;
-    r.v = Math.max(0, Math.min(r.v + acc * dt, Math.max(vt, r.v - 20 * dt)));
-    if (go) r.prog += r.v * dt;
-    if (!r.finished && r.prog >= track.laps * T.L) { r.finished = true; r.time = raceT; }
-    const p = sampleAt(r.prog + S0());
-    r.x = p.x - p.tz * r.d; r.z = p.z + p.tx * r.d; r.y = p.y; r.idx = p.i;
-    r.yaw = damp(r.yaw, headingOf(p.tx, p.tz) - Math.atan2(r.dv || 0, Math.max(8, r.v)), 12, dt);
-    r.pitch = Math.atan((T.py[(p.i + 1) % T.N] - T.py[mod(p.i - 1, T.N)]) / (2 * DS));
-    r.brk = acc < 0 && r.v > 10;
-    r.latA = r.v * r.v * T.k[p.i];
-  }
-  if (go) for (let a = 0; a < rivals.length; a++) for (let b = a + 1; b < rivals.length; b++) {
-    const A = rivals[a], B = rivals[b], ds = B.prog - A.prog, dd = B.d - A.d;
-    if (Math.abs(ds) < 4.6 && Math.abs(dd) < 2.0) {
-      const sd = Math.sign(dd) || 1, push = (2.0 - Math.abs(dd)) * 2.5 * dt;
-      A.dv -= sd * push * 4; B.dv += sd * push * 4;          // se apartan de lado poco a poco
-      const back = ds > 0 ? A : B, front = ds > 0 ? B : A;
-      if (Math.abs(dd) < 1.4) back.v = Math.min(back.v, front.v * 0.99);
+    // atasco o sentido contrario: recolocar
+    const rel = Math.abs(angDiff(headingOf(T.tx[r.idx], T.tz[r.idx]), r.yaw));
+    r.wrong = rel > 1.9 && r.v > 4 ? r.wrong + dt : 0;
+    r.stuck = go && !r.finished && r.v < 3 && (Math.abs(r.d) > ROAD_W / 2 || rel > 1.0 || !r.isPlayer) ? r.stuck + dt : 0;
+    if (r.stuck > (r.isPlayer ? 3 : 2) || r.wrong > 3) respawn(r);
+    // nitro: derrapar y rebufo lo recargan
+    if (r.isPlayer && go && !r.finished) {
+      const st = r.stats;
+      if (Math.abs(r.drift) > 0.09 && r.vx > 18) { r.nitro = Math.min(st.nitro, r.nitro + dt * 0.5 * Math.min(1, Math.abs(r.drift) / 0.22)); if (!r.driftMsg) { r.driftMsg = 1; showMsg('¡DERRAPE! +NITRO', '#7fe8ff', 0.9); } } else r.driftMsg = 0;
+      if (r.draft) r.nitro = Math.min(st.nitro, r.nitro + dt * 0.18);
+      if (!r.boost) r.nitro = Math.min(st.nitro, r.nitro + dt * 0.035);
+    }
+    // ajuste suave de ritmo de los rivales según la distancia contigo
+    if (!r.isPlayer && player && player.isPlayer && !player.finished) {
+      const gap = r.prog - player.prog, f = gap > 80 ? 0.97 : gap < -120 ? 1.03 : 1;
+      r.powMul = damp(r.powMul || 1, (r.basePow || 1) * f, 0.5, dt);
+    }
+    if (!r.finished && r.prog >= r.lap * T.L) {
+      if (r.isPlayer) {
+        const lt = raceT - r.lapStart; r.lapTimes.push(lt); r.lapStart = raceT; r.lap++;
+        if (mode === 'trial') ghostLap(lt);
+        if (r.lap > track.laps) { r.finished = true; r.time = raceT; finishRace(); }
+        else { AU.lap(); showMsg(r.lap === track.laps ? '¡VUELTA FINAL!' : 'VUELTA ' + r.lap, '#ffd24a', 1.8); }
+      } else { r.lap++; if (r.lap > track.laps) { r.finished = true; r.time = raceT; } }
     }
   }
+  collideCars();
+  if (mode === 'trial' && ghostRec && go && player.isPlayer) recordGhost();
 }
 
 /* ---------- guía de trazada: verde (bien), amarillo (afloja), rojo (frena) ---------- */
@@ -301,7 +349,7 @@ function updateGuide() {
   const ratio = new Float32Array(n);
   for (let k = 0; k < n; k++) {
     const sa = s0 + 6 + k * step;
-    let kk = 0; for (let q = 0; q < 3; q++) kk = Math.max(kk, Math.abs(T.k[Math.floor(mod(sa + q * 2, T.L) / DS) % T.N]));
+    let kk = 0; for (let q = 0; q < 3; q++) kk = Math.max(kk, T.kp[Math.floor(mod(sa + q * 2, T.L) / DS) % T.N]);
     const vc = vcAt(kk + 1e-5), dist = Math.max(1, sa - s0);
     ratio[k] = v > vc ? (v * v - vc * vc) / (2 * dist) / decMax : 0;
   }
@@ -320,20 +368,28 @@ function updateGuide() {
   guide.m.geometry.attributes.position.needsUpdate = true; guide.m.geometry.attributes.color.needsUpdate = true;
 }
 
-/* ---------- colocar los coches en la escena ---------- */
+/* ---------- colocar los coches: suspensión con muelle y amortiguador ---------- */
 function poseCar(r, dt) {
   const c = r.car, u = c.userData;
   c.position.set(r.x, r.y, r.z);
   c.rotation.set(0, r.yaw, r.pitch || 0);
-  u.body.rotation.x = damp(u.body.rotation.x, clamp(-(r.latA || 0) * 0.0045, -0.06, 0.06), 6, dt);
-  u.body.rotation.z = damp(u.body.rotation.z, clamp(-(r.lonA || 0) * 0.0018, -0.035, 0.035), 6, dt);
-  u.body.rotation.y = 0;
-  for (const w of u.wheels) { w.spin.rotation.z -= (r.isPlayer ? r.vx : r.v) * dt / 0.37; if (w.front) w.pivot.rotation.y = r.isPlayer ? -r.steer * 2.2 : clamp(-(r.td - r.d) * 0.08, -0.3, 0.3); }
-  setBrake(c, r.isPlayer ? (input.brake && r.v > 1) : r.brk, theme.night);
+  // balanceo en curva y cabeceo al frenar/acelerar, con su pequeño rebote
+  const rollT = clamp(-(r.latA || 0) * 0.0032, -0.065, 0.065), pitchT = clamp((r.lonA || 0) * 0.0024, -0.05, 0.03);
+  const k = 70, cdamp = 9, h = Math.min(dt, 0.05);
+  r.rollV = (r.rollV || 0) + ((rollT - (r.roll || 0)) * k - (r.rollV || 0) * cdamp) * h; r.roll = (r.roll || 0) + r.rollV * h;
+  r.pitchV = (r.pitchV || 0) + ((pitchT - (r.pitchB || 0)) * k - (r.pitchV || 0) * cdamp) * h; r.pitchB = (r.pitchB || 0) + r.pitchV * h;
+  u.body.rotation.x = r.roll; u.body.rotation.z = r.pitchB; u.body.rotation.y = 0;
+  // vibración del asfalto / la hierba
+  const bump = (r.rough > 0.5 ? 0.025 : 0.004) * Math.min(1, (r.v || 0) / 30);
+  u.body.position.y = 0.02 * Math.min(1, Math.abs(r.lonA || 0) / 20) * (r.lonA < 0 ? -1 : 0.5) + (Math.random() - 0.5) * bump;
+  const vx = r.vx !== undefined ? r.vx : r.v;
+  for (const w of u.wheels) { w.spin.rotation.z -= vx * dt / 0.37; if (w.front) w.pivot.rotation.y = -(r.steer || 0) * 1.6; }
+  setBrake(c, r.brk, theme.night);
 }
 
-/* ---------- cámara ---------- */
+/* ---------- cámara de retransmisión ---------- */
 const _v = new THREE.Vector3();
+let camH = 0, camBob = 0;
 function updateCamera(dt, r, cine) {
   const fx = Math.cos(r.yaw), fz = -Math.sin(r.yaw);
   if (cine) { // cámara de exhibición en los menús
@@ -343,22 +399,30 @@ function updateCamera(dt, r, cine) {
     camera.position.copy(camPos); camera.lookAt(r.x, r.y + 0.8, r.z);
     camera.fov = 50; camera.updateProjectionMatrix(); return;
   }
-  camYaw = camInit ? camYaw + angDiff(camYaw, r.yaw - (r.drift || 0) * 0.55) * (1 - Math.exp(-dt * 7)) : r.yaw;
-  const cfx = Math.cos(camYaw), cfz = -Math.sin(camYaw), v = r.v;
-  const modeC = save.cam;
-  let back = 5.8 + v * 0.012, up = 1.95 + v * 0.004, ahead = 7;
-  if (modeC === 1) { back = 9 + v * 0.015; up = 3.4; ahead = 10; }
-  if (modeC === 2) { back = -0.6; up = 1.22; ahead = 30; }
-  _v.set(r.x - cfx * back, r.y + up, r.z - cfz * back);
-  if (modeC === 2) camPos.copy(_v); else camPos.lerp(_v, camInit ? 1 - Math.exp(-dt * 12) : 1);
+  const v = r.v || 0, beta = r.vx > 5 ? Math.atan2(r.vy || 0, r.vx) : 0;
+  // la cámara sigue la dirección en la que se mueve el coche, con retraso: así se ve girar y derrapar
+  const target = r.yaw - beta * 0.75;
+  camYaw = camInit ? camYaw + angDiff(camYaw, target) * (1 - Math.exp(-dt * 4.5)) : target;
+  const cfx = Math.cos(camYaw), cfz = -Math.sin(camYaw), modeC = save.cam;
+  let back = 5.4 + v * 0.018, up = 1.65 + v * 0.003, ahead = 4, lookUp = 1.05;
+  if (modeC === 1) { back = 8.5 + v * 0.02; up = 3.0; ahead = 6; lookUp = 1.2; }
+  if (modeC === 2) { back = -0.55; up = 1.18; ahead = 30; lookUp = 1.0; }
+  camH = camInit ? damp(camH, r.y, 6, dt) : r.y;
+  _v.set(r.x - cfx * back, camH + up, r.z - cfz * back);
+  if (modeC === 2) camPos.copy(_v).setY(r.y + up);
+  else camPos.lerp(_v, camInit ? 1 - Math.exp(-dt * 9) : 1);
   camInit = true;
-  camLook.set(r.x + fx * ahead, r.y + (modeC === 2 ? 1.0 : 0.9), r.z + fz * ahead);
+  camLook.set(r.x + fx * ahead, r.y + lookUp, r.z + fz * ahead);
   camera.position.copy(camPos);
+  // vibración: baches según velocidad, más fuerte fuera de pista y en choques
+  camBob += dt * (8 + v * 0.4);
+  const vib = Math.min(1, v / 80) * 0.012 + (r.rough > 0.5 ? 0.05 : 0) * Math.min(1, v / 20);
+  camera.position.y += Math.sin(camBob) * vib + (Math.random() - 0.5) * vib;
   if (shake > 0) camera.position.add(_v.set((Math.random() - 0.5) * shake * 0.35, (Math.random() - 0.5) * shake * 0.25, (Math.random() - 0.5) * shake * 0.35));
   camera.lookAt(camLook);
-  camera.rotation.z += clamp((r.latA || 0) * 0.0007, -0.025, 0.025);
-  const fov = 58 + Math.min(v, 100) * 0.13 + (r.boost ? 7 : 0);
-  camera.fov = damp(camera.fov, fov, 4, dt); camera.updateProjectionMatrix();
+  camera.rotation.z += (modeC === 2 ? (r.roll || 0) * 0.8 : (r.roll || 0) * 0.35) + clamp(-(r.latA || 0) * 0.0006, -0.02, 0.02);
+  const fov = 60 + Math.min(v, 100) * 0.14 + (r.boost ? 7 : 0);
+  camera.fov = damp(camera.fov, fov, 3, dt); camera.updateProjectionMatrix();
   if (headLight && headLight.visible) { headLight.position.set(r.x + fx * 1.5, r.y + 1.1, r.z + fz * 1.5); headLight.target.position.set(r.x + fx * 40, r.y, r.z + fz * 40); }
 }
 
@@ -441,8 +505,7 @@ function updateRace(dt) {
     START_LIGHTS.forEach((m, k) => m.emissiveIntensity = k < n ? 5 : 0);
     if (n > 5 - lastCount) { lastCount = 5 - n; if (n > 0) AU.beep(false); }
   } else if (lastCount >= 0) { lastCount = -1; START_LIGHTS.forEach(m => m.emissiveIntensity = 0); AU.beep(true); showMsg('¡YA!', '#3dff7a', 1); vibrate(80); }
-  updatePlayer(dt);
-  updateRivals(dt);
+  physicsStep(dt);
   updateGhost();
   const p = player, sp = p.v / (p.stats.top / 3.6);
   const g7 = Math.min(6.99, sp * 6.4), gear = Math.floor(g7), frac = g7 - gear;

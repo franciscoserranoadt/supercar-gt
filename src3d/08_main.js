@@ -15,11 +15,11 @@ function startDemo() {
   buildTracks(ti); clearCars();
   player = { finished: true, prog: -1e9, d: 0, v: 0, isPlayer: false };
   const field = makeField().slice(0, 5); field[0].m = save.car; field[0].color = PAINT[save.colors[save.car] ?? CARS[save.car].paint];
-  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false); r.top = (300 + k * 4) / 3.6; r.grip = 1.55; r.lane = (k % 3 - 1) * 1.6; rivals.push(r); racers.push(r); });
+  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false, carStats(f.m, { motor: 0, grip: 0, nitro: 0 })); setupRival(r, 0.95, k); r.basePow = r.powMul = 0.85; rivals.push(r); racers.push(r); });
   raceT = 5; demo = { ti }; camInit = false;
 }
 function updateDemo(dt) {
-  raceT += dt; updateRivals(dt);
+  raceT += dt; physicsStep(dt);
   for (const r of racers) poseCar(r, dt);
   const lead = rivals[0];
   updateCamera(dt, lead, true);
@@ -384,4 +384,4 @@ function boot() {
   requestAnimationFrame(t => { lastT = t; frame(t); });
 }
 boot();
-if (/[?&]debug/.test(location.search) || !window.Android) window.__g = { updateRace, input, sampleAt, headingOf, get mode() { return mode; }, startRace, setState, doAction, save, T, get player() { return player; }, get state() { return state; }, get racers() { return racers; }, get raceT() { return raceT; }, set raceT(v) { raceT = v; }, get fps() { return frameAvg; }, standings };
+if (/[?&]debug/.test(location.search) || !window.Android) window.__g = { aiInputs, physicsStep, updateRace, input, sampleAt, headingOf, get mode() { return mode; }, startRace, setState, doAction, save, T, get player() { return player; }, get state() { return state; }, get racers() { return racers; }, get raceT() { return raceT; }, set raceT(v) { raceT = v; }, get fps() { return frameAvg; }, standings };

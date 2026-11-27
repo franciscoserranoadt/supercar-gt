@@ -15,7 +15,7 @@ function startDemo() {
   buildTracks(ti); clearCars();
   player = { finished: true, prog: -1e9, d: 0, v: 0, isPlayer: false };
   const field = makeField().slice(0, 5); field[0].m = save.car; field[0].color = PAINT[save.colors[save.car] ?? CARS[save.car].paint];
-  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false); r.top = (300 + k * 4) / 3.6; r.grip = 1.3; r.lane = (k % 3 - 1) * 1.6; rivals.push(r); racers.push(r); });
+  field.forEach((f, k) => { const r = makeRacer(f.m, f.color, f.name, k, false); r.top = (300 + k * 4) / 3.6; r.grip = 1.55; r.lane = (k % 3 - 1) * 1.6; rivals.push(r); racers.push(r); });
   raceT = 5; demo = { ti }; camInit = false;
 }
 function updateDemo(dt) {

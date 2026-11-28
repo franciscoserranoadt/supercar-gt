@@ -1,6 +1,6 @@
 /* ===== MUNDO 3D: pista, terreno, decorado, cielo y luces ===== */
 let scene = null, camera = null, sun = null, hemi = null, pmrem = null, envRT = null;
-let world = null, skyMat = null, rainFx = null, headLight = null;
+let world = null, skyMat = null, rainFx = null, headLight = null, lampLights = [];
 let trackIdx = -1, track = null, theme = THEMES.park;
 const T = { N: 0, L: 0, ds: DS };   // datos de la pista: px, py, pz, tx, tz, k, wall, map
 
@@ -258,6 +258,12 @@ function terrainY(x, z) {
   const d = Math.sqrt(bd), near = minY - 0.35, w = clamp((d - ROAD_W / 2 - 12) / 50, 0, 1);
   return lerp(near, Math.max(near - 2, far * (theme.night || theme.buildings ? 0.15 : 1)), w * w * (3 - 2 * w));
 }
+function updateLamps(x, z) {   // las 4 farolas más cercanas iluminan de verdad coches y asfalto
+  if (!lampLights.length) return;
+  const L = theme.night && T.lamps ? T.lamps : [];
+  const best = L.map(p => [(p[0] - x) ** 2 + (p[2] - z) ** 2, p]).sort((a, b) => a[0] - b[0]).slice(0, 4);
+  lampLights.forEach((l, k) => { const b = best[k]; if (!b) { l.intensity = 0; return; } l.position.set(b[1][0], b[1][1], b[1][2]); l.intensity = 70 * clamp(1.4 - Math.sqrt(b[0]) / 60, 0, 1); });
+}
 function wallAt(i, s) { i = mod(i, T.N); return s > 0 ? T.wallR[i] : T.wallL[i]; }
 function trackPos(i, d) { i = mod(i, T.N); return [T.px[i] - T.tz[i] * d, T.py[i], T.pz[i] + T.tx[i] * d]; }   // derecha = (-tz, tx)
 
@@ -331,6 +337,8 @@ function buildTracks(ti) {
   if (th.rain) buildRain(); else rainFx = null;
   if (th.night) { if (!headLight) { headLight = new THREE.SpotLight(0xfff1d8, 900, 160, 0.42, 0.5, 1.4); scene.add(headLight); scene.add(headLight.target); } headLight.visible = true; }
   else if (headLight) headLight.visible = false;
+  if (th.night && !lampLights.length) for (let k = 0; k < 4; k++) { const l = new THREE.PointLight(0xffd29a, 0, 34, 1.3); scene.add(l); lampLights.push(l); }
+  lampLights.forEach(l => { l.intensity = 0; });
   buildEnv();
 }
 function terrainMeshY(x, z) {   // altura real de la malla del terreno (interpolada)
@@ -366,7 +374,8 @@ function buildTerrain() {
   mesh.receiveShadow = true; world.add(mesh);
   // suelo lejano hasta el horizonte
   const far = new THREE.Mesh(new THREE.CircleGeometry(9000, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: shade(theme.grass, -0.1), roughness: 1 }));
-  far.position.set(cx, -6, cz); world.add(far);
+  let hmin = 1e9; for (let k = 0; k < hg.length; k++) if (hg[k] < hmin) hmin = hg[k];
+  far.position.set(cx, Math.min(-6, hmin - 1.5), cz); world.add(far);
   if (theme.buildings === 'pastel') {
     const sea = new THREE.Mesh(new THREE.CircleGeometry(9000, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#1f6fb0', roughness: 0.15, metalness: 0.3 }));
     sea.position.set(cx + size * 0.55 + 4000, -2, cz); sea.scale.set(1, 1, 1); world.add(sea);
@@ -528,13 +537,18 @@ function buildScenery() {
   }
   // farolas (de noche o en ciudad)
   if (th.night || th.buildings === 'pastel' || th.fuji) {
-    const poles = [], heads = [], glow = glowTex();
+    const poles = [], heads = [], pools = [], glow = glowTex(); T.lamps = [];
     for (let i = 0; i < N; i += th.night ? 18 : 30) for (const s of [-1, 1]) {
       const d = s * (wallAt(i, s) - 0.4), [x, y, z] = trackPos(i, d);
       poles.push([x, y + 4.5, z, 0, 1]);
       const [hx, , hz] = trackPos(i, s * (wallAt(i, s) - 2.2));
       heads.push([hx, y + 9, hz, 0, 1]);
+      if (th.night) { const pd = s * Math.max(0, wallAt(i, s) - 6), [px, py, pz] = trackPos(i, pd); pools.push([px, py + 0.06, pz, Math.atan2(-T.tz[i], T.tx[i]), 1]); T.lamps.push([hx, y + 8.6, hz]); }
       if (th.night) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: '#ffd9a0', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: true })); sp.position.set(hx, y + 8.8, hz); sp.scale.set(7, 7, 1); world.add(sp); }
+    }
+    if (pools.length) {
+      const pt = canvasTex(256, 256, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,214,150,0.95)'); gr.addColorStop(0.35, 'rgba(255,200,130,0.55)'); gr.addColorStop(0.7, 'rgba(255,190,120,0.15)'); gr.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+      instanced(new THREE.PlaneGeometry(30, 22).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: pt, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.32, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), pools, false);
     }
     instanced(new THREE.CylinderGeometry(0.12, 0.16, 9, 6), new THREE.MeshStandardMaterial({ color: '#5b6068', metalness: 0.6, roughness: 0.4 }), poles, true);
     instanced(new THREE.BoxGeometry(1.4, 0.25, 0.5), new THREE.MeshStandardMaterial({ color: '#333', emissive: th.night ? '#ffe2b0' : '#000', emissiveIntensity: 3 }), heads, false);

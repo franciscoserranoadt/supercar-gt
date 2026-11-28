@@ -423,6 +423,7 @@ function updateCamera(dt, r, cine) {
   camera.rotation.z += (modeC === 2 ? (r.roll || 0) * 0.8 : (r.roll || 0) * 0.35) + clamp(-(r.latA || 0) * 0.0006, -0.02, 0.02);
   const fov = 60 + Math.min(v, 100) * 0.14 + (r.boost ? 7 : 0);
   camera.fov = damp(camera.fov, fov, 3, dt); camera.updateProjectionMatrix();
+  updateLamps(r.x, r.z);
   if (headLight && headLight.visible) { headLight.position.set(r.x + fx * 1.5, r.y + 1.1, r.z + fz * 1.5); headLight.target.position.set(r.x + fx * 40, r.y, r.z + fz * 40); }
   if (window.__camOverride) { const o = window.__camOverride; camera.position.set(o.p[0], o.p[1], o.p[2]); if (o.top) camera.up.set(0, 0, -1); camera.lookAt(o.l[0], o.l[1], o.l[2]); camera.up.set(0, 1, 0); camera.fov = o.fov || 50; camera.updateProjectionMatrix(); }
 }
